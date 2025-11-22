@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Upload, Download, ExternalLink, Plus, Trash2, Edit2, Check, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
-import { getClient, getClientAssets, updateClientAssets, uploadFile, updateClient, updateUserPassword } from "../../utils/api";
+import { getClient, getClientAssets, updateClientAssets, uploadFile, updateClient, updateUserPassword, createMetadataAsset, updateMetadataAsset } from "../../utils/api";
 import { Input } from "../ui/input";
 
 interface AdminClientDetailProps {
@@ -126,17 +126,20 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     }
 
     try {
-      const newColor = { ...colorForm };
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          colors: [...(assets.brandAssets?.colors || []), newColor]
-        }
-      };
+      // Convert hex to RGB
+      const hex = colorForm.hex.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const rgb = `rgb(${r}, ${g}, ${b})`;
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Create metadata asset in database
+      const description = `HEX: ${colorForm.hex} | RGB: ${rgb}`;
+      await createMetadataAsset(clientId, `Brand Color - ${colorForm.name}`, description);
+
+      // Reload client data to refresh assets
+      await loadClientData();
+
       setEditingColor(null);
       setColorForm({ name: '', hex: '#' });
       alert('✅ Color added successfully!');
@@ -147,27 +150,34 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
   };
 
   const handleEditColor = (index: number) => {
+    const color = assets.brandAssets.colors[index];
     setEditingColor(index);
-    setColorForm(assets.brandAssets.colors[index]);
+    setColorForm({ name: color.name, hex: color.hex });
   };
 
   const handleUpdateColor = async () => {
     if (!colorForm.name || !colorForm.hex) return;
 
     try {
-      const updatedColors = [...assets.brandAssets.colors];
-      updatedColors[editingColor!] = colorForm;
+      const color = assets.brandAssets.colors[editingColor!];
+      
+      // Convert hex to RGB
+      const hex = colorForm.hex.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const rgb = `rgb(${r}, ${g}, ${b})`;
 
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          colors: updatedColors
-        }
-      };
+      // Update metadata asset in database
+      const description = `HEX: ${colorForm.hex} | RGB: ${rgb}`;
+      await updateMetadataAsset(color.id, {
+        label: `Brand Color - ${colorForm.name}`,
+        description
+      });
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       setEditingColor(null);
       setColorForm({ name: '', hex: '#' });
       alert('✅ Color updated successfully!');
@@ -181,16 +191,15 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this color?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          colors: assets.brandAssets.colors.filter((_: any, i: number) => i !== index)
-        }
-      };
+      const color = assets.brandAssets.colors[index];
+      
+      // Delete from database
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(color.id);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Color deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting color:', error);
@@ -263,18 +272,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     }
 
     try {
-      const newWebsite = {
-        id: crypto.randomUUID(),
-        ...websiteForm
-      };
+      // Create metadata asset in database
+      const description = `URL: ${websiteForm.url}${websiteForm.thumbnail ? ' | With thumbnail' : ''}`;
+      await createMetadataAsset(clientId, `Website - ${websiteForm.name}`, description);
 
-      const updatedAssets = {
-        ...assets,
-        websiteAssets: [...(assets.websiteAssets || []), newWebsite]
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowWebsiteForm(false);
       setWebsiteForm({ name: '', url: '', thumbnail: '' });
       alert('✅ Website asset added successfully!');
@@ -297,17 +301,16 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!websiteForm.name || !websiteForm.url) return;
 
     try {
-      const updatedWebsites = assets.websiteAssets.map((site: any) =>
-        site.id === editingWebsite ? { ...site, ...websiteForm } : site
-      );
+      // Update metadata asset in database
+      const description = `URL: ${websiteForm.url}${websiteForm.thumbnail ? ' | With thumbnail' : ''}`;
+      await updateMetadataAsset(editingWebsite!, {
+        label: `Website - ${websiteForm.name}`,
+        description
+      });
 
-      const updatedAssets = {
-        ...assets,
-        websiteAssets: updatedWebsites
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowWebsiteForm(false);
       setEditingWebsite(null);
       setWebsiteForm({ name: '', url: '', thumbnail: '' });
@@ -322,13 +325,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this website asset?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        websiteAssets: assets.websiteAssets.filter((s: any) => s.id !== siteId)
-      };
+      // Delete from database
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(siteId);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Website asset deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting website:', error);
@@ -344,21 +347,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     }
 
     try {
-      const newLink = {
-        id: crypto.randomUUID(),
-        ...figmaForm
-      };
+      // Create metadata asset in database
+      const description = `URL: ${figmaForm.url} | Figma design file`;
+      await createMetadataAsset(clientId, `Figma - ${figmaForm.name}`, description);
 
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          figmaLinks: [...(assets.productAssets?.figmaLinks || []), newLink]
-        }
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowFigmaForm(false);
       setFigmaForm({ name: '', url: '' });
       alert('✅ Figma link added successfully!');
@@ -381,20 +376,16 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!figmaForm.name || !figmaForm.url) return;
 
     try {
-      const updatedLinks = assets.productAssets.figmaLinks.map((link: any) =>
-        link.id === editingFigma ? { ...link, ...figmaForm } : link
-      );
+      // Update metadata asset in database
+      const description = `URL: ${figmaForm.url} | Figma design file`;
+      await updateMetadataAsset(editingFigma!, {
+        label: `Figma - ${figmaForm.name}`,
+        description
+      });
 
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          figmaLinks: updatedLinks
-        }
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowFigmaForm(false);
       setEditingFigma(null);
       setFigmaForm({ name: '', url: '' });
@@ -409,16 +400,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this Figma link?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          figmaLinks: assets.productAssets.figmaLinks.filter((l: any) => l.id !== linkId)
-        }
-      };
+      // Delete from database
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(linkId);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Figma link deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting figma link:', error);
@@ -434,21 +422,12 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     }
 
     try {
-      const newEntry = {
-        id: crypto.randomUUID(),
-        ...changelogForm
-      };
+      // Create metadata asset in database
+      await createMetadataAsset(clientId, `Changelog - ${changelogForm.date}`, changelogForm.note);
 
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          changelog: [...(assets.productAssets?.changelog || []), newEntry]
-        }
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowChangelogForm(false);
       setChangelogForm({ date: '', note: '' });
       alert('✅ Changelog entry added successfully!');
@@ -462,7 +441,8 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     const entry = assets.productAssets.changelog.find((e: any) => e.id === entryId);
     if (entry) {
       setEditingChangelog(entryId);
-      setChangelogForm({ date: entry.date, note: entry.note });
+      // Extract date from version field and note from title field (from DB mapping)
+      setChangelogForm({ date: entry.version || entry.date, note: entry.title || entry.note });
       setShowChangelogForm(true);
     }
   };
@@ -471,20 +451,15 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!changelogForm.date || !changelogForm.note) return;
 
     try {
-      const updatedChangelog = assets.productAssets.changelog.map((entry: any) =>
-        entry.id === editingChangelog ? { ...entry, ...changelogForm } : entry
-      );
+      // Update metadata asset in database
+      await updateMetadataAsset(editingChangelog!, {
+        label: `Changelog - ${changelogForm.date}`,
+        description: changelogForm.note
+      });
 
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          changelog: updatedChangelog
-        }
-      };
+      // Reload client data to refresh assets
+      await loadClientData();
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
       setShowChangelogForm(false);
       setEditingChangelog(null);
       setChangelogForm({ date: '', note: '' });
@@ -499,16 +474,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this changelog entry?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        productAssets: {
-          ...assets.productAssets,
-          changelog: assets.productAssets.changelog.filter((e: any) => e.id !== entryId)
-        }
-      };
+      // Delete from database
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(entryId);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Changelog entry deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting changelog:', error);

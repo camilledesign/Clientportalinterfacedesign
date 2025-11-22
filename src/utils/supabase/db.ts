@@ -596,6 +596,62 @@ export async function uploadAsset(
 }
 
 /**
+ * Create a metadata-only asset (no file upload)
+ * Used for: colors, URLs, changelog entries, etc.
+ */
+export async function createMetadataAsset(
+  userId: string,
+  label: string,
+  description: string
+): Promise<AssetRecord> {
+  try {
+    console.log('🔵 Creating metadata asset:', { userId, label, description });
+
+    const asset = await createAsset({
+      user_id: userId,
+      label,
+      description,
+      file_path: null,
+      file_size: null,
+      mime_type: null,
+    });
+
+    console.log('✅ Metadata asset created:', asset.id);
+    return asset;
+  } catch (error) {
+    console.error('❌ createMetadataAsset error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a metadata-only asset
+ */
+export async function updateMetadataAsset(
+  assetId: string,
+  updates: { label?: string; description?: string }
+): Promise<void> {
+  try {
+    console.log('🔵 Updating metadata asset:', assetId, updates);
+
+    const { error } = await supabase
+      .from('assets')
+      .update(updates)
+      .eq('id', assetId);
+
+    if (error) {
+      console.error('❌ updateMetadataAsset error:', error);
+      throw error;
+    }
+
+    console.log('✅ Metadata asset updated:', assetId);
+  } catch (error) {
+    console.error('❌ updateMetadataAsset error:', error);
+    throw error;
+  }
+}
+
+/**
  * Get signed URL for a private asset
  */
 export async function getAssetSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string> {

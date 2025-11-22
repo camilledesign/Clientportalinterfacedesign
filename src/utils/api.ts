@@ -652,6 +652,63 @@ export async function deleteAsset(assetId: string) {
   }
 }
 
+/**
+ * Create a metadata-only asset (no file upload)
+ * Used by: Admin panel for colors, URLs, changelog, etc.
+ */
+export async function createMetadataAsset(clientId: string, label: string, description: string) {
+  console.log('🔵 createMetadataAsset: Creating metadata asset for client', clientId);
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const { createMetadataAsset: dbCreateMetadataAsset } = await import('./supabase/db');
+    const asset = await dbCreateMetadataAsset(clientId, label, description);
+
+    console.log('✅ createMetadataAsset: Asset created', asset.id);
+
+    return {
+      success: true,
+      asset,
+    };
+  } catch (error: any) {
+    console.error('❌ createMetadataAsset: Failed to create asset', error);
+    throw new Error(error.message || 'Failed to create metadata asset');
+  }
+}
+
+/**
+ * Update a metadata-only asset
+ * Used by: Admin panel for editing colors, URLs, changelog, etc.
+ */
+export async function updateMetadataAsset(assetId: string, updates: { label?: string; description?: string }) {
+  console.log('🔵 updateMetadataAsset: Updating metadata asset', assetId);
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const { updateMetadataAsset: dbUpdateMetadataAsset } = await import('./supabase/db');
+    await dbUpdateMetadataAsset(assetId, updates);
+
+    console.log('✅ updateMetadataAsset: Asset updated', assetId);
+
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error('❌ updateMetadataAsset: Failed to update asset', error);
+    throw new Error(error.message || 'Failed to update metadata asset');
+  }
+}
+
 // ============================================
 // ADMIN - CLIENT CRUD (Placeholder)
 // ============================================
@@ -670,8 +727,35 @@ export async function createClient(data: any) {
  * Update client profile
  */
 export async function updateClient(clientId: string, updates: any) {
-  console.log('⚠️ updateClient: Not fully implemented');
-  throw new Error('Client updates not yet implemented. Use Profile settings instead.');
+  console.log('🔵 updateClient: Updating client profile', clientId);
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const { updateIn } = await import('./supabase/db');
+    const result = await updateIn('profiles', { id: clientId }, {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    console.log('✅ updateClient: Client profile updated');
+
+    return {
+      success: true,
+      client: result.data?.[0],
+    };
+  } catch (error: any) {
+    console.error('❌ updateClient: Failed to update client', error);
+    throw new Error(error.message || 'Failed to update client');
+  }
 }
 
 /**
