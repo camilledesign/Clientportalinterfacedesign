@@ -624,6 +624,34 @@ export async function uploadFile(clientId: string, file: File, label: string, de
   }
 }
 
+/**
+ * Delete an asset
+ * Used by: Admin panel asset deletion
+ */
+export async function deleteAsset(assetId: string) {
+  console.log('🔵 deleteAsset: Deleting asset', assetId);
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const { deleteAssetWithFile } = await import('./supabase/db');
+    await deleteAssetWithFile(assetId);
+
+    console.log('✅ deleteAsset: Asset deleted', assetId);
+
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error('❌ deleteAsset: Failed to delete asset', error);
+    throw new Error(error.message || 'Failed to delete asset');
+  }
+}
+
 // ============================================
 // ADMIN - CLIENT CRUD (Placeholder)
 // ============================================

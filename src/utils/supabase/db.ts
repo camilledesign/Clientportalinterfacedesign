@@ -497,6 +497,55 @@ export async function deleteAsset(assetId: string): Promise<void> {
 }
 
 /**
+ * Delete an asset and its file from storage
+ */
+export async function deleteAssetWithFile(assetId: string): Promise<void> {
+  try {
+    // 1. Fetch asset to get file_path
+    const { data: asset, error: fetchError } = await supabase
+      .from('assets')
+      .select('file_path')
+      .eq('id', assetId)
+      .single();
+
+    if (fetchError) {
+      console.error('❌ Error fetching asset for deletion:', fetchError);
+      throw fetchError;
+    }
+
+    // 2. Delete file from storage if file_path exists
+    if (asset?.file_path) {
+      const { error: storageError } = await supabase.storage
+        .from('assets')
+        .remove([asset.file_path]);
+
+      if (storageError) {
+        console.error('❌ Error deleting file from storage:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      } else {
+        console.log('✅ File deleted from storage:', asset.file_path);
+      }
+    }
+
+    // 3. Delete database record
+    const { error: deleteError } = await supabase
+      .from('assets')
+      .delete()
+      .eq('id', assetId);
+
+    if (deleteError) {
+      console.error('❌ Error deleting asset from database:', deleteError);
+      throw deleteError;
+    }
+
+    console.log('✅ Asset deleted completely:', assetId);
+  } catch (error) {
+    console.error('❌ deleteAssetWithFile error:', error);
+    throw error;
+  }
+}
+
+/**
  * Upload file to Supabase Storage and create asset record
  */
 export async function uploadAsset(

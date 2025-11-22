@@ -16,14 +16,6 @@ export function Footer() {
               <Globe className="w-4 h-4" />
               camillehaidar.com
             </a>
-            
-            {/* RLS Test Link (temporary) */}
-            <a
-              href="#rls-test"
-              className="text-xs text-[rgba(0,0,0,0.15)] hover:text-[rgba(0,0,0,0.3)] transition-colors"
-            >
-              Test
-            </a>
           </div>
 
           {/* Social Links */}

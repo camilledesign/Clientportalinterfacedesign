@@ -74,7 +74,6 @@
     --color-red-500: oklch(.637 .237 25.331);
     --color-red-600: oklch(.577 .245 27.325);
     --color-red-700: oklch(.505 .213 27.518);
-    --color-red-800: oklch(.444 .177 26.899);
     --color-red-900: oklch(.396 .141 25.723);
     --color-orange-100: oklch(.954 .038 75.164);
     --color-orange-500: oklch(.705 .213 47.604);
@@ -106,7 +105,6 @@
     --color-gray-50: oklch(.985 .002 247.839);
     --color-gray-100: oklch(.967 .003 264.542);
     --color-gray-200: oklch(.928 .006 264.531);
-    --color-gray-600: oklch(.446 .03 256.802);
     --color-gray-700: oklch(.373 .034 259.733);
     --color-black: #000;
     --color-white: #fff;
@@ -692,10 +690,6 @@
 
   .ml-2 {
     margin-left: calc(var(--spacing) * 2);
-  }
-
-  .ml-4 {
-    margin-left: calc(var(--spacing) * 4);
   }
 
   .ml-5 {
@@ -1482,20 +1476,12 @@
     background-color: var(--color-gray-100);
   }
 
-  .bg-gray-200 {
-    background-color: var(--color-gray-200);
-  }
-
   .bg-green-50 {
     background-color: var(--color-green-50);
   }
 
   .bg-green-100 {
     background-color: var(--color-green-100);
-  }
-
-  .bg-green-500 {
-    background-color: var(--color-green-500);
   }
 
   .bg-green-500\/10 {
@@ -1570,10 +1556,6 @@
 
   .bg-red-100 {
     background-color: var(--color-red-100);
-  }
-
-  .bg-red-500 {
-    background-color: var(--color-red-500);
   }
 
   .bg-red-600 {
@@ -1850,10 +1832,6 @@
     font-size: 10px;
   }
 
-  .text-\[16px\] {
-    font-size: 16px;
-  }
-
   .text-\[18px\] {
     font-size: 18px;
   }
@@ -1901,10 +1879,6 @@
     white-space: pre;
   }
 
-  .whitespace-pre-wrap {
-    white-space: pre-wrap;
-  }
-
   .text-\[\#34C759\] {
     color: #34c759;
   }
@@ -1949,10 +1923,6 @@
     color: #0000001f;
   }
 
-  .text-\[rgba\(0\,0\,0\,0\.15\)\] {
-    color: #00000026;
-  }
-
   .text-\[rgba\(0\,0\,0\,0\.35\)\] {
     color: #00000059;
   }
@@ -1967,10 +1937,6 @@
 
   .text-foreground {
     color: var(--foreground);
-  }
-
-  .text-gray-600 {
-    color: var(--color-gray-600);
   }
 
   .text-gray-700 {
@@ -2031,10 +1997,6 @@
 
   .text-red-700 {
     color: var(--color-red-700);
-  }
-
-  .text-red-800 {
-    color: var(--color-red-800);
   }
 
   .text-red-900 {
@@ -2514,12 +2476,6 @@
   @media (hover: hover) {
     .hover\:text-\[\#111111\]:hover {
       color: #111;
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:text-\[rgba\(0\,0\,0\,0\.3\)\]:hover {
-      color: #0000004d;
     }
   }
 

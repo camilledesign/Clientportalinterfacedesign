@@ -14,7 +14,7 @@ export function Login({ onSuccess }: LoginProps) {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       setError("Please enter both email and password");
       return;
@@ -23,38 +23,50 @@ export function Login({ onSuccess }: LoginProps) {
     try {
       setLoading(true);
       setError("");
-      
-      console.log('🔵 Login: Attempting sign in for:', email);
-      
+
+      console.log("🔵 Login: Attempting sign in for:", email);
+
       // NO TIMEOUT - let Supabase take as long as it needs
       // This will show a loading spinner, but won't artificially fail
       await signInWithPassword(email, password);
-      
-      console.log('✅ Login: Sign in successful');
-      
+
+      console.log("✅ Login: Sign in successful");
+
       onSuccess();
     } catch (err: any) {
-      console.error('❌ Login: Sign in error:', err);
-      
+      console.error("❌ Login: Sign in error:", err);
+
       // Provide more specific error messages
-      let errorMessage = "Login failed. Please check the console for details.";
-      
-      if (err.message?.includes('Invalid login credentials')) {
+      let errorMessage =
+        "Login failed. Please check the console for details.";
+
+      if (err.message?.includes("Invalid login credentials")) {
         errorMessage = "Invalid email or password";
-      } else if (err.message?.includes('Email not confirmed')) {
-        errorMessage = "Please confirm your email before signing in";
-      } else if (err.message?.includes('relation') || err.message?.includes('table') || err.message?.includes('policy') || err.message?.includes('profiles')) {
-        errorMessage = "Database error. Please run the setup script (see error screen).";
+      } else if (err.message?.includes("Email not confirmed")) {
+        errorMessage =
+          "Please confirm your email before signing in";
+      } else if (
+        err.message?.includes("relation") ||
+        err.message?.includes("table") ||
+        err.message?.includes("policy") ||
+        err.message?.includes("profiles")
+      ) {
+        errorMessage =
+          "Database error. Please run the setup script (see error screen).";
         // Force a refresh to show the database setup screen
         setTimeout(() => {
           window.location.reload();
         }, 1500);
-      } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        errorMessage = "Network error. Cannot reach Supabase. Check if the project is paused or your internet connection.";
+      } else if (
+        err.message?.includes("Failed to fetch") ||
+        err.message?.includes("NetworkError")
+      ) {
+        errorMessage =
+          "Network error. Cannot reach Supabase. Check if the project is paused or your internet connection.";
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -66,16 +78,26 @@ export function Login({ onSuccess }: LoginProps) {
       <div className="w-full max-w-md">
         {/* Logo / Header */}
         <div className="text-center mb-8">
-          <h1 className="text-[32px] text-[#111111] mb-2">Client Portal</h1>
-          <p className="text-[rgba(0,0,0,0.5)]">Sign in to continue</p>
+          <h1 className="text-[32px] text-[#111111] mb-2">
+            Design Hub
+          </h1>
+          <p className="text-[rgba(0,0,0,0.5)]">
+            Sign in to continue
+          </p>
         </div>
 
         {/* Login Card */}
         <div className="bg-white rounded-[24px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-8">
-          <form onSubmit={handlePasswordSubmit} className="space-y-6">
+          <form
+            onSubmit={handlePasswordSubmit}
+            className="space-y-6"
+          >
             {/* Email Input */}
             <div>
-              <label htmlFor="email" className="block text-sm text-[rgba(0,0,0,0.7)] mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm text-[rgba(0,0,0,0.7)] mb-2"
+              >
                 Email
               </label>
               <input
@@ -92,7 +114,10 @@ export function Login({ onSuccess }: LoginProps) {
 
             {/* Password Input */}
             <div>
-              <label htmlFor="password" className="block text-sm text-[rgba(0,0,0,0.7)] mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm text-[rgba(0,0,0,0.7)] mb-2"
+              >
                 Password
               </label>
               <input

@@ -105,16 +105,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this logo?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          logos: assets.brandAssets.logos.filter((l: any) => l.id !== logoId)
-        }
-      };
+      // Delete from database and storage
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(logoId);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Logo deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting logo:', error);
@@ -207,29 +204,18 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
 
     try {
       setUploading(true);
-      const result = await uploadFile(file, 'make-a93d7fb4-documents', `${clientId}/guidelines/${file.name}`);
+      console.log('🔵 Uploading guideline for client:', clientId);
       
-      const newGuideline = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-        url: result.url
-      };
-
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          guidelines: [...(assets.brandAssets?.guidelines || []), newGuideline]
-        }
-      };
-
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Upload using proper API
+      await uploadFile(clientId, file, 'Brand Guidelines', `Complete brand style guide - ${file.name}`);
+      
+      // Reload client data to show the new asset
+      await loadClientData();
+      
       alert('✅ Guideline uploaded successfully!');
     } catch (error: any) {
-      console.error('Error uploading guideline:', error);
-      alert(`❌ Failed to upload guideline: ${error.message}`);
+      console.error('❌ Guideline upload failed:', error);
+      alert(`Failed to upload guideline: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -239,16 +225,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
     if (!confirm('Are you sure you want to delete this guideline?')) return;
 
     try {
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          guidelines: assets.brandAssets.guidelines.filter((g: any) => g.id !== guidelineId)
-        }
-      };
+      // Delete from database and storage
+      const { deleteAsset } = await import('../../utils/api');
+      await deleteAsset(guidelineId);
 
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Reload client data to refresh assets
+      await loadClientData();
+
       alert('✅ Guideline deleted successfully!');
     } catch (error: any) {
       console.error('Error deleting guideline:', error);

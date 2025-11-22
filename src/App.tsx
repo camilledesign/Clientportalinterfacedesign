@@ -1,8 +1,8 @@
+import { ClientDashboard } from "./components/ClientDashboard";
 import { AdminPanel } from "./components/admin/AdminPanel";
 import { Login } from "./components/Login";
 import { DatabaseCleanup } from "./components/DatabaseCleanup";
 import { AuthDebug } from "./components/AuthDebug";
-import { SupabaseRLSTest } from "./components/SupabaseRLSTest";
 import { DatabaseSetup } from "./components/DatabaseSetup";
 import { isAuthenticated, initUserProfile } from "./utils/auth";
 import { supabase } from "./utils/supabase/client";
@@ -30,7 +30,6 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [showCleanup, setShowCleanup] = useState(false);
   const [showAuthDebug, setShowAuthDebug] = useState(false);
-  const [showRLSTest, setShowRLSTest] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [needsDbSetup, setNeedsDbSetup] = useState(false);
 
@@ -43,10 +42,8 @@ export default function App() {
       if (!hash.includes('access_token')) {
         const isCleanup = hash === "#cleanup";
         const isDebug = hash === "#auth-debug";
-        const isRLSTest = hash === "#rls-test";
         setShowCleanup(isCleanup);
         setShowAuthDebug(isDebug);
-        setShowRLSTest(isRLSTest);
       }
     };
 
@@ -164,11 +161,6 @@ export default function App() {
   // Show auth debug panel if accessing auth debug route
   if (showAuthDebug) {
     return <AuthDebug />;
-  }
-
-  // Show RLS test panel if accessing RLS test route
-  if (showRLSTest) {
-    return <SupabaseRLSTest />;
   }
 
   // Show loading while checking authentication
