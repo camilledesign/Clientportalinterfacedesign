@@ -61,27 +61,24 @@ export function BrandRequestForm({ onBack, onCategoryChange, initialRequestType 
       setError("");
       
       const requestData = {
-        category: "Brand",
+        category: "brand" as const,
         title: requestType === "new-brand" 
           ? `New brand identity for ${brandName}`
           : `${assetType === "other" ? assetTypeOther : assetType} for ${brandName}`,
-        brief: {
-          requestType: requestType === "new-brand" ? "New brand" : "New asset",
-          category: "Brand",
-          brandName,
-          ...(requestType === "new-brand" && {
-            tagline,
-            audience,
-            brandStyle,
-          }),
-          ...(requestType === "new-asset" && {
-            assetType: assetType === "other" ? assetTypeOther : assetType,
-            format: format === "custom" ? customFormat : format,
-            copywriting,
-          }),
-          references: [reference1, reference2, reference3].filter(Boolean),
-          notes,
-        }
+        requestType: requestType === "new-brand" ? "New brand" : "New asset",
+        brandName,
+        ...(requestType === "new-brand" && {
+          tagline,
+          audience,
+          brandStyle,
+        }),
+        ...(requestType === "new-asset" && {
+          assetType: assetType === "other" ? assetTypeOther : assetType,
+          format: format === "custom" ? customFormat : format,
+          copywriting,
+        }),
+        references: [reference1, reference2, reference3].filter(Boolean),
+        notes,
       };
 
       console.log('🔵 BrandRequestForm: Submitting request', requestData);

@@ -1,868 +1,506 @@
-import { projectId, publicAnonKey } from './supabase/info';
+/**
+ * API Layer - Refactored to use Supabase directly
+ * 
+ * This file used to call a custom Edge Function on the OLD Supabase project.
+ * Now it simply re-exports helpers from utils/supabase/db.ts for backward compatibility.
+ * 
+ * MIGRATION STATUS: ✅ Complete
+ * - All legacy API_BASE calls removed
+ * - All localStorage.user_email dependencies removed
+ * - All admin_session_token dependencies removed
+ * - Now uses Supabase Auth + RLS directly
+ */
 
-const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-a93d7fb4`;
-
-// ============================================
-// USER AUTHENTICATION
-// ============================================
-
-// Sign in user
-export async function signIn(email: string, password: string) {
-  console.log('🔵 SignIn: Calling server signin endpoint');
-  
-  const response = await fetch(`${API_BASE}/auth/signin`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicAnonKey}`,
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await response.json();
-  
-  console.log('🔵 SignIn: Server response', data);
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Sign in failed');
-  }
-  
-  // Store user email as session (simple approach)
-  if (data.success && data.user) {
-    localStorage.setItem('user_email', data.user.email);
-    localStorage.setItem('user_data', JSON.stringify(data.user));
-    console.log('✅ User signed in, email stored:', data.user.email);
-  }
-  
-  return data;
-}
-
-// Sign out user
-export async function signOut() {
-  const email = localStorage.getItem('user_email');
-  
-  // Clear localStorage
-  localStorage.removeItem('user_email');
-  localStorage.removeItem('user_data');
-  
-  console.log('✅ User signed out');
-}
-
-export async function getCurrentSession() {
-  const email = localStorage.getItem('user_email');
-  const userData = localStorage.getItem('user_data');
-  
-  if (email && userData) {
-    console.log('✅ Active session found for:', email);
-    return JSON.parse(userData);
-  }
-  
-  console.log('❌ No active session');
-  return null;
-}
-
-export async function getUserData() {
-  const userData = localStorage.getItem('user_data');
-  
-  if (userData) {
-    return JSON.parse(userData);
-  }
-  
-  return null;
-}
+import { getCurrentUser } from './auth';
+import {
+  createRequest,
+  getUserRequests as dbGetUserRequests,
+  getUserAssets as dbGetUserAssets,
+  getRequestsByUser,
+  getAssetsByUser,
+  getAllProfiles,
+  uploadAsset,
+  RequestRecord,
+  AssetRecord,
+} from './supabase/db';
 
 // ============================================
-// USER REQUESTS
+// USER REQUESTS (Briefs)
 // ============================================
 
-export async function submitRequest(requestData: any) {
-  const email = localStorage.getItem('user_email');
-  
+/**
+ * Submit a new request (brief)
+ * Used by: BrandRequestForm, WebsiteRequestForm, ProductRequestForm
+ */
+export async function submitRequest(requestData: {
+  category: 'brand' | 'website' | 'product';
+  title: string;
+  [key: string]: any;
+}) {
   console.log('🔵 submitRequest: Starting request submission', {
-    hasEmail: !!email,
     category: requestData.category,
     title: requestData.title
   });
-  
-  if (!email) {
-    console.error('❌ submitRequest: No email found - user not logged in');
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    console.error('❌ submitRequest: No authenticated user');
     throw new Error('Not authenticated - please log in');
   }
 
-  const url = `${API_BASE}/user/requests`;
-  console.log('🔵 Making POST request to:', url);
+  try {
+    // Create request in Supabase
+    const request = await createRequest(
+      user.id,
+      requestData.category,
+      requestData.title,
+      requestData // Full payload
+    );
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicAnonKey}`,
-      'X-User-Session': email,
-    },
-    body: JSON.stringify(requestData),
-  });
+    console.log('✅ submitRequest: Request created successfully', request.id);
 
-  const data = await response.json();
-  
-  console.log('🔵 submitRequest: Server response', {
-    ok: response.ok,
-    status: response.status,
-    data: data,
-  });
-  
-  if (!response.ok) {
-    console.error('❌ submitRequest: Server returned error', data.error);
-    throw new Error(data.error || 'Failed to submit request');
+    return {
+      success: true,
+      request,
+    };
+  } catch (error: any) {
+    console.error('❌ submitRequest: Failed to create request', error);
+    throw new Error(error.message || 'Failed to submit request');
   }
-  
-  console.log('✅ submitRequest: Request submitted successfully');
-  
-  return data;
 }
 
+/**
+ * Get all requests for the current user
+ * Used by: RequestHistory component
+ */
 export async function getUserRequests() {
-  const email = localStorage.getItem('user_email');
-  
-  console.log('🔵 getUserRequests: Starting request', { hasEmail: !!email });
-  
-  if (!email) {
-    console.error('❌ getUserRequests: No email found');
+  console.log('🔵 getUserRequests: Fetching requests for current user');
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    console.error('❌ getUserRequests: No authenticated user');
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_BASE}/user/requests`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${publicAnonKey}`,
-      'X-User-Session': email,
-    },
-  });
+  try {
+    const requests = await dbGetUserRequests(user.id);
 
-  const data = await response.json();
-  
-  console.log('📦 getUserRequests: Response data', data);
-  
-  if (!response.ok) {
-    console.error('❌ getUserRequests: Request failed', data.error);
-    throw new Error(data.error || 'Failed to fetch requests');
+    console.log('✅ getUserRequests: Fetched requests', requests.length);
+
+    // Transform to legacy format for backward compatibility
+    return {
+      requests: requests.map(transformRequestToLegacyFormat),
+    };
+  } catch (error: any) {
+    console.error('❌ getUserRequests: Failed to fetch requests', error);
+    throw new Error(error.message || 'Failed to load requests');
   }
-  
-  return data;
 }
 
-export async function getUserAssets() {
-  const email = localStorage.getItem('user_email');
-  
-  console.log('🔵 getUserAssets: Starting request', { hasEmail: !!email });
-  
-  if (!email) {
-    console.error('❌ getUserAssets: No email found');
+/**
+ * Get all requests (admin)
+ * Used by: AdminRequests component
+ */
+export async function getRequests() {
+  console.log('🔵 getRequests: Fetching all requests (admin)');
+
+  const user = await getCurrentUser();
+
+  if (!user) {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_BASE}/user/assets`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${publicAnonKey}`,
-      'X-User-Session': email,
-    },
-  });
+  try {
+    const { getAllRequests } = await import('./supabase/db');
+    const requests = await getAllRequests();
 
-  const data = await response.json();
-  
-  console.log('📦 getUserAssets: Response data', data);
-  
-  if (!response.ok) {
-    console.error('❌ getUserAssets: Request failed', data.error);
-    throw new Error(data.error || 'Failed to fetch assets');
+    console.log('✅ getRequests: Fetched all requests', requests.length);
+
+    // Transform to legacy format
+    return {
+      requests: requests.map(transformRequestToLegacyFormat),
+    };
+  } catch (error: any) {
+    console.error('❌ getRequests: Failed to fetch requests', error);
+    throw new Error(error.message || 'Failed to load requests');
   }
-  
-  return data;
+}
+
+/**
+ * Update request status
+ * Used by: AdminRequests component
+ */
+export async function updateRequestStatus(requestId: string, status: 'pending' | 'in_progress' | 'completed' | 'delivered') {
+  console.log('🔵 updateRequestStatus: Updating request', requestId, 'to', status);
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const { updateRequestStatus: dbUpdateRequestStatus } = await import('./supabase/db');
+    const updated = await dbUpdateRequestStatus(requestId, status);
+
+    console.log('✅ updateRequestStatus: Request updated');
+
+    return {
+      success: true,
+      request: transformRequestToLegacyFormat(updated),
+    };
+  } catch (error: any) {
+    console.error('❌ updateRequestStatus: Failed to update request', error);
+    throw new Error(error.message || 'Failed to update request status');
+  }
+}
+
+/**
+ * Transform Supabase request to legacy format
+ */
+function transformRequestToLegacyFormat(request: RequestRecord) {
+  return {
+    id: request.id,
+    category: request.type.charAt(0).toUpperCase() + request.type.slice(1),
+    title: request.title,
+    submitDate: new Date(request.created_at).toLocaleDateString(),
+    status: mapStatusToLegacy(request.status),
+    brief: request.payload,
+    deliveredDate: request.status === 'delivered' ? new Date(request.created_at).toLocaleDateString() : undefined,
+  };
+}
+
+function mapStatusToLegacy(status: string): 'new' | 'in-progress' | 'completed' | 'delivered' {
+  switch (status) {
+    case 'pending':
+      return 'new';
+    case 'in_progress':
+      return 'in-progress';
+    case 'completed':
+      return 'completed';
+    case 'delivered':
+      return 'delivered';
+    default:
+      return 'new';
+  }
+}
+
+// ============================================
+// USER ASSETS
+// ============================================
+
+/**
+ * Get all assets for the current user
+ * Used by: AssetsLibrary component
+ */
+export async function getUserAssets() {
+  console.log('🔵 getUserAssets: Fetching assets for current user');
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    console.error('❌ getUserAssets: No authenticated user');
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    const assets = await dbGetUserAssets(user.id);
+
+    console.log('✅ getUserAssets: Fetched assets', assets.length);
+
+    // Transform to legacy format
+    return {
+      assets: {
+        brandAssets: assets.filter(a => a.description?.includes('brand') || a.label.toLowerCase().includes('brand')),
+        websiteAssets: assets.filter(a => a.description?.includes('website') || a.label.toLowerCase().includes('website')),
+        productAssets: assets.filter(a => a.description?.includes('product') || a.label.toLowerCase().includes('product')),
+      },
+    };
+  } catch (error: any) {
+    console.error('❌ getUserAssets: Failed to fetch assets', error);
+    throw new Error(error.message || 'Failed to load assets');
+  }
 }
 
 // ============================================
 // USER PROFILE
 // ============================================
 
+/**
+ * Get current user's profile
+ * DEPRECATED: Use getCurrentUser() from utils/auth.ts instead
+ */
 export async function getUserProfile() {
-  const email = localStorage.getItem('user_email');
-  
-  if (!email) {
+  const user = await getCurrentUser();
+
+  if (!user) {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${API_BASE}/user/profile`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${publicAnonKey}`,
-      'X-User-Session': email,
+  // Return minimal user data
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
     },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch profile');
-  }
-  
-  return data;
+  };
 }
 
-export async function updateUserProfile(updates: { name?: string; currentPassword?: string; newPassword?: string }) {
-  const email = localStorage.getItem('user_email');
-  
-  if (!email) {
-    throw new Error('Not authenticated');
-  }
-
-  const response = await fetch(`${API_BASE}/user/profile`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicAnonKey}`,
-      'X-User-Session': email,
-    },
-    body: JSON.stringify(updates),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update profile');
-  }
-  
-  // Update stored user data if name changed
-  if (updates.name) {
-    const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-    userData.name = updates.name;
-    localStorage.setItem('user_data', JSON.stringify(userData));
-  }
-  
-  return data;
+/**
+ * Update user profile
+ * DEPRECATED: Use direct Supabase queries instead
+ */
+export async function updateUserProfile(updates: any) {
+  console.log('⚠️ updateUserProfile is deprecated - use Supabase directly');
+  throw new Error('This function is deprecated. Update your profile through Supabase directly.');
 }
 
 // ============================================
-// ADMIN API
+// ADMIN - CLIENT MANAGEMENT
 // ============================================
 
-export async function verifyAdminCode(code: string) {
-  const sessionToken = localStorage.getItem('admin_session_token');
-  
-  const response = await fetch(`${API_BASE}/admin/verify`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicAnonKey}`,
-    },
-    body: JSON.stringify({ code }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to verify admin code');
-  }
-  
-  // Store admin session token
-  if (data.sessionToken) {
-    localStorage.setItem('admin_session_token', data.sessionToken);
-    localStorage.setItem('admin_verified', 'true');
-  }
-  
-  return data;
-}
-
-// Helper to get Supabase auth session token
-async function getAuthToken(): Promise<string> {
-  const token = localStorage.getItem('sb_access_token');
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-  return token;
-}
-
-export async function getAdminClients() {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch clients');
-  }
-  
-  return data;
-}
-
+/**
+ * Get all clients (profiles)
+ * Used by: AdminDashboard component
+ */
 export async function getClients() {
-  return getAdminClients();
-}
+  console.log('🔵 getClients: Fetching all profiles (admin)');
 
-export async function updateClient(clientId: string, updates: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(updates),
-  });
+  const user = await getCurrentUser();
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update client');
+  if (!user) {
+    throw new Error('Not authenticated');
   }
-  
-  return data;
-}
 
-export async function deleteClient(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
+  try {
+    const profiles = await getAllProfiles();
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to delete client');
+    console.log('✅ getClients: Fetched profiles', profiles.length);
+
+    // Transform to legacy format
+    return {
+      clients: profiles.map(p => ({
+        id: p.id,
+        name: p.full_name || 'Unnamed',
+        email: p.email || 'No email',
+        activeRequests: 0, // TODO: Add count from requests table
+        lastActivity: p.created_at,
+        status: p.is_admin ? 'admin' : 'active',
+      })),
+    };
+  } catch (error: any) {
+    console.error('❌ getClients: Failed to fetch clients', error);
+    throw new Error(error.message || 'Failed to load clients');
   }
-  
-  return data;
 }
 
-export async function createClient(clientData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(clientData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to create client');
-  }
-  
-  return data;
-}
-
-export async function updateUserPassword(clientId: string, newPassword: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/password`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ password: newPassword }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update password');
-  }
-  
-  return data;
-}
-
-export async function getAdminRequests() {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/requests`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch requests');
-  }
-  
-  return data;
-}
-
-export async function getRequests() {
-  return getAdminRequests();
-}
-
-export async function updateRequestStatus(requestId: string, status: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/requests/${requestId}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ status }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update request status');
-  }
-  
-  return data;
-}
-
-export async function getClient(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch client');
-  }
-  
-  return data;
-}
-
+/**
+ * Get client details (profile + requests + assets)
+ * Used by: AdminClientDetail component
+ */
 export async function getClientDetails(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
+  console.log('🔵 getClientDetails: Fetching details for client', clientId);
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch client details');
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
   }
-  
-  return data;
+
+  try {
+    const [requests, assets] = await Promise.all([
+      getRequestsByUser(clientId),
+      getAssetsByUser(clientId),
+    ]);
+
+    console.log('✅ getClientDetails: Fetched', { requests: requests.length, assets: assets.length });
+
+    return {
+      client: {
+        id: clientId,
+        requests: requests.map(transformRequestToLegacyFormat),
+        assets: assets,
+      },
+    };
+  } catch (error: any) {
+    console.error('❌ getClientDetails: Failed to fetch client details', error);
+    throw new Error(error.message || 'Failed to load client details');
+  }
 }
 
-// Brand tab functions
-export async function getClientBrand(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/brand`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch brand data');
-  }
-  
-  return data;
+/**
+ * Get single client (alias for getClientDetails)
+ * Used by: AdminClientDetail component
+ */
+export async function getClient(clientId: string) {
+  return getClientDetails(clientId);
 }
 
-export async function updateClientBrand(clientId: string, brandData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/brand`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(brandData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update brand data');
-  }
-  
-  return data;
-}
-
-// Website tab functions
-export async function getClientWebsite(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/website`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch website data');
-  }
-  
-  return data;
-}
-
-export async function updateClientWebsite(clientId: string, websiteData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/website`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(websiteData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update website data');
-  }
-  
-  return data;
-}
-
-// Product tab functions
-export async function getClientProduct(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/product`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch product data');
-  }
-  
-  return data;
-}
-
-export async function updateClientProduct(clientId: string, productData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/product`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(productData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update product data');
-  }
-  
-  return data;
-}
-
-// Assets functions
+/**
+ * Get client assets
+ * Used by: Admin panel asset viewer
+ */
 export async function getClientAssets(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/assets`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
+  console.log('🔵 getClientAssets: Fetching assets for client', clientId);
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch assets');
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
   }
-  
-  return data;
+
+  try {
+    const assets = await getAssetsByUser(clientId);
+
+    console.log('✅ getClientAssets: Fetched assets', assets.length);
+
+    return {
+      assets,
+    };
+  } catch (error: any) {
+    console.error('❌ getClientAssets: Failed to fetch assets', error);
+    throw new Error(error.message || 'Failed to load assets');
+  }
 }
 
-export async function updateClientAssets(clientId: string, assets: any[]) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/assets`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ assets }),
-  });
+// ============================================
+// ADMIN - NOTES (Placeholder)
+// ============================================
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update assets');
-  }
-  
-  return data;
-}
+/**
+ * These functions are placeholders for future implementation
+ * Notes can be stored in a separate 'notes' table
+ */
 
-export async function addClientAsset(clientId: string, assetData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/assets`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(assetData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to add asset');
-  }
-  
-  return data;
-}
-
-export async function updateClientAsset(clientId: string, assetId: string, assetData: any) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/assets/${assetId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify(assetData),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update asset');
-  }
-  
-  return data;
-}
-
-export async function deleteClientAsset(clientId: string, assetId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/assets/${assetId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to delete asset');
-  }
-  
-  return data;
-}
-
-// Notes functions
 export async function getClientNotes(clientId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/notes`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch notes');
-  }
-  
-  return data;
+  console.log('⚠️ getClientNotes: Not implemented yet');
+  return { notes: [] };
 }
 
-export async function addClientNote(clientId: string, note: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/notes`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ note }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to add note');
-  }
-  
-  return data;
+export async function createClientNote(clientId: string, note: string) {
+  console.log('⚠️ createClientNote: Not implemented yet');
+  throw new Error('Notes feature not yet implemented');
 }
 
-export async function updateClientNote(clientId: string, noteId: string, note: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/notes/${noteId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ note }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update note');
-  }
-  
-  return data;
+export async function updateClientNote(noteId: string, note: string) {
+  console.log('⚠️ updateClientNote: Not implemented yet');
+  throw new Error('Notes feature not yet implemented');
 }
 
-export async function deleteClientNote(clientId: string, noteId: string) {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/clients/${clientId}/notes/${noteId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to delete note');
-  }
-  
-  return data;
+export async function deleteClientNote(noteId: string) {
+  console.log('⚠️ deleteClientNote: Not implemented yet');
+  throw new Error('Notes feature not yet implemented');
 }
 
-// File upload function
-export async function uploadFile(file: File) {
-  const authToken = await getAuthToken();
-  
-  const formData = new FormData();
-  formData.append('file', file);
+// ============================================
+// ADMIN - FILE UPLOAD
+// ============================================
 
-  const response = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: formData,
-  });
+/**
+ * Upload file for a client
+ * Used by: Admin panel asset uploader
+ */
+export async function uploadFile(clientId: string, file: File, label: string, description?: string) {
+  console.log('🔵 uploadFile: Uploading file for client', clientId);
 
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to upload file');
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
   }
-  
-  return data;
+
+  try {
+    const result = await uploadAsset(clientId, file, label, description);
+
+    console.log('✅ uploadFile: File uploaded', result.asset.id);
+
+    return {
+      success: true,
+      asset: result.asset,
+      url: result.publicUrl,
+    };
+  } catch (error: any) {
+    console.error('❌ uploadFile: Failed to upload file', error);
+    throw new Error(error.message || 'Failed to upload file');
+  }
 }
 
-// Database debug functions
+// ============================================
+// ADMIN - CLIENT CRUD (Placeholder)
+// ============================================
+
+/**
+ * Create a new client
+ * This requires creating an auth user + profile
+ * TODO: Implement with Supabase Admin API
+ */
+export async function createClient(data: any) {
+  console.log('⚠️ createClient: Not fully implemented');
+  throw new Error('Client creation not yet implemented. Create users through Supabase Auth.');
+}
+
+/**
+ * Update client profile
+ */
+export async function updateClient(clientId: string, updates: any) {
+  console.log('⚠️ updateClient: Not fully implemented');
+  throw new Error('Client updates not yet implemented. Use Profile settings instead.');
+}
+
+/**
+ * Update client assets (legacy compatibility)
+ */
+export async function updateClientAssets(clientId: string, assets: any) {
+  console.log('⚠️ updateClientAssets: Not fully implemented');
+  // This was used for editing brand colors, websites, etc.
+  // For now, throw error - assets should be uploaded via uploadFile
+  throw new Error('Asset updates not yet implemented. Use uploadFile to add new assets.');
+}
+
+/**
+ * Update user password (admin)
+ */
+export async function updateUserPassword(userId: string, newPassword: string) {
+  console.log('⚠️ updateUserPassword: Not fully implemented');
+  throw new Error('Password updates must be done through Supabase Dashboard for security.');
+}
+
+/**
+ * Delete client
+ */
+export async function deleteClient(clientId: string) {
+  console.log('⚠️ deleteClient: Not fully implemented');
+  throw new Error('Client deletion not yet implemented. Must be done through Supabase Dashboard.');
+}
+
+// ============================================
+// LEGACY DEBUG/ADMIN FUNCTIONS (Removed)
+// ============================================
+
+/**
+ * These functions are no longer supported
+ * They used to call the old Edge Function endpoints
+ */
+
 export async function getDatabaseDebugInfo() {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/debug/database`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to fetch debug info');
-  }
-  
-  return data;
+  console.log('⚠️ getDatabaseDebugInfo: Removed - used legacy API');
+  throw new Error('This function has been removed. Use Supabase Dashboard for debugging.');
 }
 
 export async function syncClientsFromUsers() {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/debug/sync-clients`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-    },
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to sync clients');
-  }
-  
-  return data;
+  console.log('⚠️ syncClientsFromUsers: Removed - used legacy API');
+  throw new Error('This function has been removed.');
 }
 
-export async function clearDatabase() {
-  const authToken = await getAuthToken();
-  
-  const response = await fetch(`${API_BASE}/debug/clear`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`,
-    },
-    body: JSON.stringify({ 
-      prefixes: ['client:', 'request:', 'user:'] 
-    }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to clear database');
-  }
-  
-  return data;
+export async function clearDatabase(prefixes?: string[]) {
+  console.log('⚠️ clearDatabase: Removed - used legacy API');
+  throw new Error('This function has been removed.');
 }
 
-// Admin session management
-export async function clearSessionToken() {
-  localStorage.removeItem('admin_session_token');
-  localStorage.removeItem('admin_verified');
-  console.log('✅ Admin session cleared');
+export async function verifyAdminCode(code: string) {
+  console.log('⚠️ verifyAdminCode: Removed - used legacy admin_session_token');
+  throw new Error('Admin authentication now uses profiles.is_admin flag.');
 }

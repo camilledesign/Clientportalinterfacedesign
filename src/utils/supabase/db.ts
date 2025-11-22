@@ -274,6 +274,294 @@ export async function upsertProfile(profile: {
   return data;
 }
 
+/**
+ * Get all profiles (admin only)
+ */
+export async function getAllProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ getAllProfiles error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+// ============================================
+// REQUEST HELPERS
+// ============================================
+
+export interface RequestInput {
+  user_id: string;
+  type: 'brand' | 'website' | 'product';
+  title: string;
+  payload: any;
+  status?: 'pending' | 'in_progress' | 'completed' | 'delivered';
+}
+
+export interface RequestRecord {
+  id: string;
+  user_id: string;
+  type: 'brand' | 'website' | 'product';
+  title: string;
+  payload: any;
+  status: 'pending' | 'in_progress' | 'completed' | 'delivered';
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Create a new request (brief submission)
+ */
+export async function createRequest(
+  userId: string,
+  type: 'brand' | 'website' | 'product',
+  title: string,
+  payload: any
+): Promise<RequestRecord> {
+  const { data, error } = await supabase
+    .from('requests')
+    .insert({
+      user_id: userId,
+      type,
+      title,
+      payload,
+      status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ createRequest error:', error);
+    throw error;
+  }
+
+  console.log('✅ Request created:', data.id);
+  return data;
+}
+
+/**
+ * Get all requests for a specific user
+ */
+export async function getUserRequests(userId: string): Promise<RequestRecord[]> {
+  const { data, error } = await supabase
+    .from('requests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ getUserRequests error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Get all requests (admin only)
+ */
+export async function getAllRequests(): Promise<RequestRecord[]> {
+  const { data, error } = await supabase
+    .from('requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ getAllRequests error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Get requests for a specific user (admin viewing a client)
+ */
+export async function getRequestsByUser(userId: string): Promise<RequestRecord[]> {
+  return getUserRequests(userId);
+}
+
+/**
+ * Update request status
+ */
+export async function updateRequestStatus(
+  requestId: string,
+  status: 'pending' | 'in_progress' | 'completed' | 'delivered'
+): Promise<RequestRecord> {
+  const { data, error } = await supabase
+    .from('requests')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ updateRequestStatus error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+// ============================================
+// ASSET HELPERS
+// ============================================
+
+export interface AssetInput {
+  user_id: string;
+  label: string;
+  description?: string;
+  file_path: string;
+  file_size?: number;
+  mime_type?: string;
+}
+
+export interface AssetRecord {
+  id: string;
+  user_id: string;
+  label: string;
+  description: string | null;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  created_at: string;
+}
+
+/**
+ * Create asset record after file upload
+ */
+export async function createAsset(asset: AssetInput): Promise<AssetRecord> {
+  const { data, error } = await supabase
+    .from('assets')
+    .insert(asset)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ createAsset error:', error);
+    throw error;
+  }
+
+  console.log('✅ Asset created:', data.id);
+  return data;
+}
+
+/**
+ * Get all assets for a specific user
+ */
+export async function getUserAssets(userId: string): Promise<AssetRecord[]> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ getUserAssets error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Get assets for a specific user (admin viewing a client)
+ */
+export async function getAssetsByUser(userId: string): Promise<AssetRecord[]> {
+  return getUserAssets(userId);
+}
+
+/**
+ * Delete an asset
+ */
+export async function deleteAsset(assetId: string): Promise<void> {
+  const { error } = await supabase
+    .from('assets')
+    .delete()
+    .eq('id', assetId);
+
+  if (error) {
+    console.error('❌ deleteAsset error:', error);
+    throw error;
+  }
+
+  console.log('✅ Asset deleted:', assetId);
+}
+
+/**
+ * Upload file to Supabase Storage and create asset record
+ */
+export async function uploadAsset(
+  userId: string,
+  file: File,
+  label: string,
+  description?: string
+): Promise<{ asset: AssetRecord; publicUrl: string }> {
+  try {
+    // 1. Upload file to Storage
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = `${userId}/${fileName}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('assets')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('❌ File upload error:', uploadError);
+      throw uploadError;
+    }
+
+    console.log('✅ File uploaded:', uploadData.path);
+
+    // 2. Get public URL (for signed URL generation later)
+    const { data: { publicUrl } } = supabase.storage
+      .from('assets')
+      .getPublicUrl(filePath);
+
+    // 3. Create asset record in database
+    const asset = await createAsset({
+      user_id: userId,
+      label: label || file.name,
+      description,
+      file_path: filePath,
+      file_size: file.size,
+      mime_type: file.type,
+    });
+
+    return { asset, publicUrl };
+  } catch (error) {
+    console.error('❌ uploadAsset error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get signed URL for a private asset
+ */
+export async function getAssetSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('assets')
+    .createSignedUrl(filePath, expiresIn);
+
+  if (error) {
+    console.error('❌ getAssetSignedUrl error:', error);
+    throw error;
+  }
+
+  return data.signedUrl;
+}
+
 // ============================================
 // KV STORE HELPERS
 // ============================================
