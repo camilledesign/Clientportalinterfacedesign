@@ -66,10 +66,11 @@ export default function App() {
     const checkAuth = async () => {
       try {
         console.log('🔵 Starting auth check...');
-        const authenticated = await isAuthenticated();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        const authenticated = !!user && !error;
         console.log('🔵 Auth check result:', authenticated);
         
-        // If authenticated, initialize/update user profile
         if (authenticated) {
           try {
             console.log('🔵 User is authenticated, initializing profile...');
@@ -79,41 +80,26 @@ export default function App() {
             setAuthError(null);
           } catch (error: any) {
             console.error('❌ Failed to initialize user profile:', error);
-            console.error('❌ Error details:', {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint,
-              stack: error.stack
-            });
-            
-            // Check if it's a database setup issue
-            if (error.message?.includes('profiles') || 
-                error.message?.includes('relation') || 
-                error.message?.includes('does not exist') ||
-                error.code === '42P01') {
-              setNeedsDbSetup(true);
-            }
-            
-            // Set error but proceed to show UI
-            setAuthError('Database configuration error. Please check console.');
-            setIsAuth(authenticated);
-            setIsCheckingAuth(false);
-            return;
+            // Don't block the UI - just log the error
+            setCurrentUser(null);
+            setAuthError(null);
           }
+        } else {
+          setCurrentUser(null);
         }
         
-        console.log('✅ Auth check complete');
         setIsAuth(authenticated);
-        setIsCheckingAuth(false);
       } catch (error: any) {
         console.error('❌ Auth check failed:', error);
-        setAuthError(null); // Don't show error, just go to login
+        setIsAuth(false);
+        setCurrentUser(null);
+        setAuthError(null);
+      } finally {
+        // ALWAYS set isCheckingAuth to false so we never get stuck on "Loading..."
         setIsCheckingAuth(false);
       }
     };
 
-    // Just run the normal auth check - no timeout
     checkAuth();
 
     // Listen for auth state changes
@@ -129,13 +115,16 @@ export default function App() {
           setAuthError(null);
         } catch (error: any) {
           console.error('Failed to initialize user profile:', error);
-          setAuthError('Database configuration error. Please run the setup script in Supabase Dashboard.');
+          setAuthError(null); // Don't block UI
+        } finally {
+          setIsCheckingAuth(false);
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('✅ User signed out via auth state change');
         setIsAuth(false);
         setCurrentUser(null);
         setAuthError(null);
+        setIsCheckingAuth(false);
       }
     });
 

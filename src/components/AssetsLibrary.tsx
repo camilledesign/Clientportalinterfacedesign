@@ -3,7 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { WebsiteAssets } from "./assets/WebsiteAssets";
 import { BrandAssets } from "./assets/BrandAssets";
 import { ProductAssets } from "./assets/ProductAssets";
-import { getUserAssets } from "../utils/api";
+import { supabase } from "../utils/supabase/client";
 
 export function AssetsLibrary() {
   const [activeTab, setActiveTab] = useState("brand");
@@ -19,10 +19,27 @@ export function AssetsLibrary() {
     try {
       setLoading(true);
       setError("");
-      console.log('🔵 AssetsLibrary: Fetching assets...');
-      const data = await getUserAssets();
-      console.log('✅ AssetsLibrary: Assets fetched successfully', data);
-      setAssets(data.assets);
+      
+      // Check authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        setError("Not authenticated");
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🔵 AssetsLibrary: Fetching assets for user:', user.id);
+      
+      // TODO: Implement Supabase Storage asset fetching
+      // For now, show placeholder
+      setAssets({
+        brandAssets: [],
+        websiteAssets: [],
+        productAssets: []
+      });
+      
+      console.log('✅ AssetsLibrary: Assets ready (placeholder)');
     } catch (err: any) {
       console.error("❌ AssetsLibrary: Error fetching assets:", err);
       setError(err.message || "Failed to load assets");

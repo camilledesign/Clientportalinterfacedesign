@@ -13,7 +13,16 @@ export function AdminPanel() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('sb_access_token');
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Force reload anyway
+      window.location.reload();
+    }
   };
 
   const handleSelectClient = (clientId: string) => {

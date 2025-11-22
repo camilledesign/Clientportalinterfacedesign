@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getUserProfile, updateUserProfile } from "../utils/api";
+import { supabase } from "../utils/supabase/client";
+import { getProfile } from "../utils/supabase/db";
 import { Button } from "./ui/button";
 
 interface ProfileProps {
@@ -10,6 +11,7 @@ interface ProfileProps {
 export function Profile({ onBack }: ProfileProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -23,20 +25,28 @@ export function Profile({ onBack }: ProfileProps) {
 
   const loadProfile = async () => {
     try {
-      console.log('🔵 Profile: Loading profile...');
-      console.log('🔵 Profile: localStorage user_data:', localStorage.getItem('user_data'));
-      console.log('🔵 Profile: localStorage user_access_token:', localStorage.getItem('user_access_token'));
+      console.log('🔵 Profile: Loading profile from public.profiles...');
       
-      const { user } = await getUserProfile();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      console.log('✅ Profile: Profile loaded successfully:', user);
+      if (authError || !user) {
+        throw new Error('Not authenticated');
+      }
       
-      setName(user.name);
-      setEmail(user.email);
+      const profile = await getProfile(user.id);
+      
+      if (!profile) {
+        throw new Error('Profile not found');
+      }
+      
+      console.log('✅ Profile: Profile loaded successfully:', profile);
+      
+      setName(profile.full_name || '');
+      setEmail(profile.email || '');
+      setCompany(profile.company || '');
     } catch (err: any) {
       console.error("❌ Profile: Error loading profile:", err);
-      console.error("❌ Profile: Error message:", err.message);
-      setError(err.message);
+      setError(err.message || 'Failed to load profile');
     }
   };
 
@@ -56,8 +66,8 @@ export function Profile({ onBack }: ProfileProps) {
         setError("New passwords do not match");
         return;
       }
-      if (newPassword.length < 4) {
-        setError("Password must be at least 4 characters");
+      if (newPassword.length < 6) {
+        setError("Password must be at least 6 characters");
         return;
       }
     }
@@ -65,14 +75,36 @@ export function Profile({ onBack }: ProfileProps) {
     try {
       setLoading(true);
       
-      const updates: any = { name };
-      
-      if (newPassword) {
-        updates.currentPassword = currentPassword;
-        updates.newPassword = newPassword;
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('Not authenticated');
       }
       
-      await updateUserProfile(updates);
+      // Update profile in public.profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: name,
+          company: company,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (profileError) {
+        throw profileError;
+      }
+      
+      // Update password if provided
+      if (newPassword) {
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: newPassword
+        });
+        
+        if (passwordError) {
+          throw passwordError;
+        }
+      }
       
       setSuccess("Profile updated successfully!");
       
@@ -136,6 +168,21 @@ export function Profile({ onBack }: ProfileProps) {
                 disabled
               />
               <p className="text-xs text-[rgba(0,0,0,0.4)]">Email cannot be changed</p>
+            </div>
+
+            {/* Company Field */}
+            <div className="space-y-2">
+              <label htmlFor="company" className="block text-[rgba(0,0,0,0.6)]">
+                Company
+              </label>
+              <input
+                type="text"
+                id="company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="w-full px-4 py-3 bg-[#F5F5F7] rounded-[12px] border-0 text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#0071E3] transition-all"
+                disabled={loading}
+              />
             </div>
 
             {/* Password Change Section */}

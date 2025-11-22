@@ -1,20 +1,29 @@
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { LogOut } from "lucide-react";
 import profileImage from 'figma:asset/09a506315f8c8fec25acae2f02c2bbe6694afef2.png';
-import { signOut } from "../utils/auth";
-import { getUserData } from "../utils/api";
+import { supabase } from "../utils/supabase/client";
 
 interface NavigationProps {
   onProfileClick?: () => void;
 }
 
 export function Navigation({ onProfileClick }: NavigationProps) {
-  const userData = getUserData();
+  // Get user data from localStorage (set by initUserProfile)
+  const userDataStr = localStorage.getItem('user_data');
+  const userData = userDataStr ? JSON.parse(userDataStr) : null;
   const userName = userData?.name || userData?.email?.split('@')[0] || "Client";
   
   const handleLogout = async () => {
-    await signOut();
-    window.location.reload();
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('sb_access_token');
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Force reload anyway
+      window.location.reload();
+    }
   };
 
   return (
