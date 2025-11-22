@@ -56,22 +56,7 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
       console.log('✅ Assets data loaded:', assetsData);
       
       setClient(clientData.client);
-      
-      // Transform assets from database format to UI format
-      const transformedAssets = {
-        brandAssets: {
-          logos: [],
-          colors: [],
-          guidelines: []
-        },
-        websiteAssets: [],
-        productAssets: {
-          figmaLinks: [],
-          changelog: []
-        }
-      };
-      
-      setAssets(transformedAssets);
+      setAssets(assetsData);
     } catch (error: any) {
       console.error('❌ Error loading client data:', {
         clientId,

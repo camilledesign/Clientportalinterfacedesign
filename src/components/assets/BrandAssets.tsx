@@ -161,7 +161,10 @@ export function BrandAssets({ assets }: BrandAssetsProps) {
                           onClick={() => {
                             // Auto-detect format and download the appropriate version
                             const url = logo.url || logo.svgUrl || logo.pngUrl;
-                            if (url) window.open(url, '_blank');
+                            if (url) {
+                              // Open in new tab for viewing/downloading
+                              window.open(url, '_blank');
+                            }
                           }}
                         >
                           <Download className="w-3.5 h-3.5 mr-1.5" />

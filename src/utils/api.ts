@@ -206,16 +206,109 @@ export async function getUserAssets() {
   }
 
   try {
+    const { getAssetSignedUrl } = await import('./supabase/db');
     const assets = await dbGetUserAssets(user.id);
 
     console.log('✅ getUserAssets: Fetched assets', assets.length);
 
-    // Transform to legacy format
+    // Generate signed URLs for all assets
+    const assetsWithUrls = await Promise.all(
+      assets.map(async (asset) => {
+        try {
+          const url = await getAssetSignedUrl(asset.file_path, 3600);
+          return { ...asset, url };
+        } catch (error) {
+          console.error('❌ Failed to get signed URL for asset:', asset.id, error);
+          return { ...asset, url: '' };
+        }
+      })
+    );
+
+    // Transform to match UI component expectations
+    const brandLogos = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("logo") ||
+      a.description?.toLowerCase().includes("logo") ||
+      a.label.toLowerCase().includes("brand")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      formats: [a.mime_type?.split('/')[1]?.toUpperCase() || 'FILE'],
+    }));
+
+    const brandColors = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("color") ||
+      a.description?.toLowerCase().includes("color")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
+      rgb: a.description?.match(/rgb\([^)]+\)/)?.[0] || 'rgb(0, 0, 0)',
+    }));
+
+    const brandGuidelines = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("guideline") ||
+      a.description?.toLowerCase().includes("guideline") ||
+      a.label.toLowerCase().includes("guide")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      type: a.mime_type || 'Document',
+      description: a.description,
+      url: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const websiteAssets = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("website") ||
+      a.description?.toLowerCase().includes("website") ||
+      a.label.toLowerCase().includes("web")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const figmaLinks = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("figma") ||
+      a.description?.toLowerCase().includes("figma") ||
+      a.label.toLowerCase().includes("product")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const changelog = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("changelog") ||
+      a.description?.toLowerCase().includes("changelog") ||
+      a.label.toLowerCase().includes("change log")
+    ).map(a => ({
+      id: a.id,
+      version: a.label,
+      title: a.description || a.label,
+      changes: [a.description || 'No details available'],
+      date: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    // Return in the structure expected by AssetsLibrary
     return {
       assets: {
-        brandAssets: assets.filter(a => a.description?.includes('brand') || a.label.toLowerCase().includes('brand')),
-        websiteAssets: assets.filter(a => a.description?.includes('website') || a.label.toLowerCase().includes('website')),
-        productAssets: assets.filter(a => a.description?.includes('product') || a.label.toLowerCase().includes('product')),
+        brandAssets: {
+          logos: brandLogos,
+          colors: brandColors,
+          guidelines: brandGuidelines,
+        },
+        websiteAssets: websiteAssets,
+        productAssets: {
+          figmaLinks: figmaLinks,
+          changelog: changelog,
+        },
       },
     };
   } catch (error: any) {
@@ -363,12 +456,105 @@ export async function getClientAssets(clientId: string) {
   }
 
   try {
+    const { getAssetSignedUrl } = await import('./supabase/db');
     const assets = await getAssetsByUser(clientId);
 
     console.log('✅ getClientAssets: Fetched assets', assets.length);
 
+    // Generate signed URLs for all assets
+    const assetsWithUrls = await Promise.all(
+      assets.map(async (asset) => {
+        try {
+          const url = await getAssetSignedUrl(asset.file_path, 3600);
+          return { ...asset, url };
+        } catch (error) {
+          console.error('❌ Failed to get signed URL for asset:', asset.id, error);
+          return { ...asset, url: '' };
+        }
+      })
+    );
+
+    // Transform to match UI component expectations
+    const brandLogos = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("logo") ||
+      a.description?.toLowerCase().includes("logo")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      formats: [a.mime_type?.split('/')[1]?.toUpperCase() || 'FILE'],
+    }));
+
+    const brandColors = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("color") ||
+      a.description?.toLowerCase().includes("color")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
+      rgb: a.description?.match(/rgb\([^)]+\)/)?.[0] || 'rgb(0, 0, 0)',
+    }));
+
+    const brandGuidelines = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("guideline") ||
+      a.description?.toLowerCase().includes("guideline") ||
+      a.label.toLowerCase().includes("guide")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      type: a.mime_type || 'Document',
+      description: a.description,
+      url: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const websiteAssets = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("website") ||
+      a.description?.toLowerCase().includes("website") ||
+      a.label.toLowerCase().includes("web")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const figmaLinks = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("figma") ||
+      a.description?.toLowerCase().includes("figma")
+    ).map(a => ({
+      id: a.id,
+      name: a.label,
+      url: a.url,
+      thumbnail: a.url,
+      lastUpdated: new Date(a.created_at).toLocaleDateString(),
+    }));
+
+    const changelog = assetsWithUrls.filter(a =>
+      a.label.toLowerCase().includes("changelog") ||
+      a.description?.toLowerCase().includes("changelog") ||
+      a.label.toLowerCase().includes("change log")
+    ).map(a => ({
+      id: a.id,
+      version: a.label,
+      title: a.description || a.label,
+      changes: [a.description || 'No details available'],
+      date: new Date(a.created_at).toLocaleDateString(),
+    }));
+
     return {
-      assets,
+      brandAssets: {
+        logos: brandLogos,
+        colors: brandColors,
+        guidelines: brandGuidelines,
+      },
+      websiteAssets: websiteAssets,
+      productAssets: {
+        figmaLinks: figmaLinks,
+        changelog: changelog,
+      },
     };
   } catch (error: any) {
     console.error('❌ getClientAssets: Failed to fetch assets', error);
