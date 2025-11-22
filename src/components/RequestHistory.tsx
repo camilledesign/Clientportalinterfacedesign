@@ -2,7 +2,7 @@ import { Clock, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { BriefModal } from "./BriefModal";
 import { Button } from "./ui/button";
-import { supabase } from "../utils/supabase/client";
+import { getUserRequests } from "../utils/api";
 
 interface Request {
   id: string;
@@ -30,22 +30,14 @@ export function RequestHistory() {
       setLoading(true);
       setError("");
       
-      // Check authentication
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('🔵 RequestHistory: Fetching requests from Supabase...');
       
-      if (authError || !user) {
-        setError("Not authenticated");
-        setLoading(false);
-        return;
-      }
+      // Fetch requests using API helper
+      const result = await getUserRequests();
       
-      console.log('🔵 RequestHistory: Fetching requests for user:', user.id);
+      console.log('✅ RequestHistory: Fetched requests:', result.requests.length);
       
-      // TODO: Implement request fetching from Supabase
-      // For now, show placeholder
-      setRequests([]);
-      
-      console.log('✅ RequestHistory: Requests ready (placeholder)');
+      setRequests(result.requests);
     } catch (err: any) {
       console.error("❌ RequestHistory: Error fetching requests:", err);
       setError(err.message || "Failed to load requests");

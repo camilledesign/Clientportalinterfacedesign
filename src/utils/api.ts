@@ -311,16 +311,26 @@ export async function getClientDetails(clientId: string) {
   }
 
   try {
-    const [requests, assets] = await Promise.all([
+    const { getProfile } = await import('./supabase/db');
+    
+    const [profile, requests, assets] = await Promise.all([
+      getProfile(clientId),
       getRequestsByUser(clientId),
       getAssetsByUser(clientId),
     ]);
 
-    console.log('✅ getClientDetails: Fetched', { requests: requests.length, assets: assets.length });
+    console.log('✅ getClientDetails: Fetched', { 
+      profile: profile ? 'found' : 'not found',
+      requests: requests.length,
+      assets: assets.length 
+    });
 
     return {
       client: {
         id: clientId,
+        name: profile?.full_name || 'Unnamed Client',
+        email: profile?.email || '',
+        company: profile?.company,
         requests: requests.map(transformRequestToLegacyFormat),
         assets: assets,
       },

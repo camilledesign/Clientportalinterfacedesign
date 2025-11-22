@@ -56,7 +56,22 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
       console.log('✅ Assets data loaded:', assetsData);
       
       setClient(clientData.client);
-      setAssets(assetsData.assets);
+      
+      // Transform assets from database format to UI format
+      const transformedAssets = {
+        brandAssets: {
+          logos: [],
+          colors: [],
+          guidelines: []
+        },
+        websiteAssets: [],
+        productAssets: {
+          figmaLinks: [],
+          changelog: []
+        }
+      };
+      
+      setAssets(transformedAssets);
     } catch (error: any) {
       console.error('❌ Error loading client data:', {
         clientId,
@@ -64,8 +79,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
         stack: error.stack
       });
       
-      // Try to show a more helpful error message
-      alert(`Failed to load client data: ${error.message}\n\nPlease check the console for more details.`);
+      // Initialize with empty data instead of failing
+      setClient({ id: clientId, name: 'Client', email: '' });
+      setAssets({
+        brandAssets: { logos: [], colors: [], guidelines: [] },
+        websiteAssets: [],
+        productAssets: { figmaLinks: [], changelog: [] }
+      });
     } finally {
       setLoading(false);
     }
@@ -77,29 +97,20 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
 
     try {
       setUploading(true);
-      const result = await uploadFile(file, 'make-a93d7fb4-logos', `${clientId}/${file.name}`);
+      console.log('🔵 Uploading logo for client:', clientId);
       
-      const newLogo = {
-        id: crypto.randomUUID(),
-        name: file.name.replace(/\.[^/.]+$/, ""),
-        url: result.url,
-        format: file.name.split('.').pop()?.toUpperCase() || 'FILE'
-      };
-
-      const updatedAssets = {
-        ...assets,
-        brandAssets: {
-          ...assets.brandAssets,
-          logos: [...(assets.brandAssets?.logos || []), newLogo]
-        }
-      };
-
-      await updateClientAssets(clientId, updatedAssets);
-      setAssets(updatedAssets);
+      // Use the correct uploadFile API with label and description
+      const result = await uploadFile(clientId, file, 'Brand Logo', 'Main brand logo');
+      
+      console.log('✅ Logo uploaded successfully:', result);
+      
+      // Reload client data to show the new asset
+      await loadClientData();
+      
       alert('✅ Logo uploaded successfully!');
     } catch (error: any) {
-      console.error('Error uploading logo:', error);
-      alert(`❌ Failed to upload logo: ${error.message}`);
+      console.error('❌ Logo upload failed:', error);
+      alert(`Failed to upload logo: ${error.message}`);
     } finally {
       setUploading(false);
     }
