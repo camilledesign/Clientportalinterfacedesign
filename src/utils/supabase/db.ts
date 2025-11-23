@@ -1,4 +1,5 @@
 import { supabase } from './client';
+import { wrapSupabaseError } from './errors';
 
 /**
  * Supabase Database Utilities

@@ -4,6 +4,7 @@ import { WebsiteAssets } from "./assets/WebsiteAssets";
 import { BrandAssets } from "./assets/BrandAssets";
 import { ProductAssets } from "./assets/ProductAssets";
 import { getUserAssets } from "../utils/api";
+import { handlePossibleSessionError } from "../utils/supabase/errors";
 
 export function AssetsLibrary() {
   const [activeTab, setActiveTab] = useState("brand");
@@ -29,6 +30,12 @@ export function AssetsLibrary() {
       
       setAssets(result.assets);
     } catch (err: any) {
+      // Check if it's a session error
+      if (handlePossibleSessionError(err)) {
+        // Session expired - global handler will redirect to login
+        return;
+      }
+      
       console.error("❌ AssetsLibrary: Error fetching assets:", err);
       setError(err.message || "Failed to load assets");
     } finally {

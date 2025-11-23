@@ -17,6 +17,7 @@ import { Profile } from "./components/Profile";
 import { WebsiteRequestForm } from "./components/forms/WebsiteRequestForm";
 import { BrandRequestForm } from "./components/forms/BrandRequestForm";
 import { ProductRequestForm } from "./components/forms/ProductRequestForm";
+import { setOnSessionExpired } from "./utils/supabase/errors";
 
 type MainSection = "new-request" | "asset-library" | "request-history" | "profile" | "admin";
 type FormView = "website-form" | "brand-form" | "product-form" | null;
@@ -32,6 +33,26 @@ export default function App() {
   const [showAuthDebug, setShowAuthDebug] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [needsDbSetup, setNeedsDbSetup] = useState(false);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
+
+  // Register global session expiry handler
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      console.log('🔴 Session expired - clearing auth state');
+      setIsAuth(false);
+      setCurrentUser(null);
+      setSessionExpiredMessage('Your session has expired. Please log in again.');
+      
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        setSessionExpiredMessage(null);
+      }, 5000);
+    });
+
+    return () => {
+      setOnSessionExpired(() => {});
+    };
+  }, []);
 
   // Check for admin hash on mount and listen for changes
   useEffect(() => {
@@ -303,7 +324,19 @@ GRANT ALL ON public.profiles TO service_role;`}
 
   // Show login if not authenticated
   if (!isAuth) {
-    return <Login onSuccess={handleLoginSuccess} />;
+    return (
+      <>
+        {/* Session expired notification */}
+        {sessionExpiredMessage && (
+          <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+            <div className="bg-red-50 border border-red-200 text-red-800 px-6 py-3 rounded-[12px] shadow-lg">
+              {sessionExpiredMessage}
+            </div>
+          </div>
+        )}
+        <Login onSuccess={handleLoginSuccess} />
+      </>
+    );
   }
 
   // Show admin panel if user is admin

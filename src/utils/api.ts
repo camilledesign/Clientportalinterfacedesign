@@ -23,6 +23,7 @@ import {
   RequestRecord,
   AssetRecord,
 } from './supabase/db';
+import { wrapSupabaseError, handlePossibleSessionError } from './supabase/errors';
 
 // ============================================
 // USER REQUESTS (Briefs)

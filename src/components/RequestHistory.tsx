@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { BriefModal } from "./BriefModal";
 import { Button } from "./ui/button";
 import { getUserRequests } from "../utils/api";
+import { handlePossibleSessionError } from "../utils/supabase/errors";
 
 interface Request {
   id: string;
@@ -39,6 +40,12 @@ export function RequestHistory() {
       
       setRequests(result.requests);
     } catch (err: any) {
+      // Check if it's a session error
+      if (handlePossibleSessionError(err)) {
+        // Session expired - global handler will redirect to login
+        return;
+      }
+      
       console.error("❌ RequestHistory: Error fetching requests:", err);
       setError(err.message || "Failed to load requests");
     } finally {
