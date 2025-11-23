@@ -238,15 +238,22 @@ export async function getUserAssets() {
       formats: [a.mime_type?.split('/')[1]?.toUpperCase() || 'FILE'],
     }));
 
+    // Detect colors by: file_path is null AND description contains "HEX:"
+    // This works for both old "Brand Color - " format and new format
     const brandColors = assetsWithUrls.filter(a =>
-      a.label.toLowerCase().includes("color") ||
-      a.description?.toLowerCase().includes("color")
-    ).map(a => ({
-      id: a.id,
-      name: a.label,
-      hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
-      rgb: a.description?.match(/rgb\([^)]+\)/)?.[0] || 'rgb(0, 0, 0)',
-    }));
+      a.file_path === null &&
+      a.description?.includes('HEX:')
+    ).map(a => {
+      // Remove "Brand Color - " prefix if it exists (legacy support)
+      const displayName = a.label.replace(/^Brand Color - /i, '');
+      
+      return {
+        id: a.id,
+        name: displayName,
+        hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
+        rgb: a.description?.match(/RGB: ([^|]+)/)?.[1]?.trim() || 'rgb(0, 0, 0)',
+      };
+    });
 
     const brandGuidelines = assetsWithUrls.filter(a =>
       a.label.toLowerCase().includes("guideline") ||
@@ -487,15 +494,22 @@ export async function getClientAssets(clientId: string) {
       formats: [a.mime_type?.split('/')[1]?.toUpperCase() || 'FILE'],
     }));
 
+    // Detect colors by: file_path is null AND description contains "HEX:"
+    // This works for both old "Brand Color - " format and new format
     const brandColors = assetsWithUrls.filter(a =>
-      a.label.toLowerCase().includes("color") ||
-      a.description?.toLowerCase().includes("color")
-    ).map(a => ({
-      id: a.id,
-      name: a.label,
-      hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
-      rgb: a.description?.match(/rgb\([^)]+\)/)?.[0] || 'rgb(0, 0, 0)',
-    }));
+      a.file_path === null &&
+      a.description?.includes('HEX:')
+    ).map(a => {
+      // Remove "Brand Color - " prefix if it exists (legacy support)
+      const displayName = a.label.replace(/^Brand Color - /i, '');
+      
+      return {
+        id: a.id,
+        name: displayName,
+        hex: a.description?.match(/#[0-9A-Fa-f]{6}/)?.[0] || '#000000',
+        rgb: a.description?.match(/RGB: ([^|]+)/)?.[1]?.trim() || 'rgb(0, 0, 0)',
+      };
+    });
 
     const brandGuidelines = assetsWithUrls.filter(a =>
       a.label.toLowerCase().includes("guideline") ||

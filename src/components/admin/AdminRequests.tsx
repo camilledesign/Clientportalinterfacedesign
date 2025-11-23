@@ -56,6 +56,47 @@ export function AdminRequests() {
     }
   };
 
+  // Build clean filter option lists from actual data
+  const getUniqueClients = () => {
+    const clients = requests
+      .map(req => req.clientName)
+      .filter((name, index, self) => name && self.indexOf(name) === index)
+      .sort();
+    return ['All Clients', ...clients];
+  };
+
+  const getUniqueCategories = () => {
+    const categories = requests
+      .map(req => req.category)
+      .filter((cat, index, self) => cat && self.indexOf(cat) === index)
+      .sort();
+    return ['All Categories', ...categories];
+  };
+
+  const getUniquePriorities = () => {
+    const priorities = requests
+      .map(req => req.priority)
+      .filter((priority, index, self) => priority && self.indexOf(priority) === index)
+      .sort((a, b) => {
+        // Sort: high, medium, low
+        const order: Record<string, number> = { high: 1, medium: 2, low: 3 };
+        return (order[a!] || 999) - (order[b!] || 999);
+      });
+    return ['All Priorities', ...priorities];
+  };
+
+  // Apply all three filters together
+  const getFilteredRequests = () => {
+    return requests.filter(req => {
+      const matchesClient = filters.client === 'all' || req.clientName === filters.client;
+      const matchesCategory = filters.category === 'all' || req.category?.toLowerCase() === filters.category.toLowerCase();
+      const matchesPriority = filters.priority === 'all' || req.priority === filters.priority;
+      return matchesClient && matchesCategory && matchesPriority;
+    });
+  };
+
+  const filteredRequests = getFilteredRequests();
+
   const handleStatusChange = async (requestId: string, newStatus: "new" | "in-progress" | "waiting-feedback" | "done") => {
     try {
       // Optimistically update UI
@@ -87,7 +128,7 @@ export function AdminRequests() {
   };
 
   const getRequestsByStatus = (status: string) => {
-    return requests.filter((req) => req.status === status);
+    return filteredRequests.filter((req) => req.status === status);
   };
 
   return (
@@ -106,9 +147,9 @@ export function AdminRequests() {
           className="px-4 py-2 bg-white border border-[rgba(0,0,0,0.06)] rounded-[12px] text-[#111111] text-sm outline-none focus:border-[#0071E3] transition-colors"
         >
           <option value="all">All Clients</option>
-          <option value="techflow">TechFlow AI</option>
-          <option value="stellar">Stellar Commerce</option>
-          <option value="quantum">Quantum Labs</option>
+          {getUniqueClients().filter(c => c !== 'All Clients').map(client => (
+            <option key={client} value={client}>{client}</option>
+          ))}
         </select>
 
         <select
@@ -117,9 +158,9 @@ export function AdminRequests() {
           className="px-4 py-2 bg-white border border-[rgba(0,0,0,0.06)] rounded-[12px] text-[#111111] text-sm outline-none focus:border-[#0071E3] transition-colors"
         >
           <option value="all">All Categories</option>
-          <option value="brand">Brand</option>
-          <option value="website">Website</option>
-          <option value="product">Product</option>
+          {getUniqueCategories().filter(c => c !== 'All Categories').map(category => (
+            <option key={category} value={category.toLowerCase()}>{category}</option>
+          ))}
         </select>
 
         <select
@@ -128,9 +169,9 @@ export function AdminRequests() {
           className="px-4 py-2 bg-white border border-[rgba(0,0,0,0.06)] rounded-[12px] text-[#111111] text-sm outline-none focus:border-[#0071E3] transition-colors"
         >
           <option value="all">All Priorities</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          {getUniquePriorities().filter(p => p !== 'All Priorities').map(priority => (
+            <option key={priority} value={priority}>{priority}</option>
+          ))}
         </select>
 
         <div className="ml-auto flex gap-2">

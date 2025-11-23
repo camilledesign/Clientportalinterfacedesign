@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Search, LayoutDashboard, Users, FileText, FolderOpen, Settings, LogOut } from "lucide-react";
+import { Search, Users, FileText, FolderOpen, Settings, LogOut } from "lucide-react";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminRequests } from "./AdminRequests";
 import { AdminClientDetail } from "./AdminClientDetail";
 import { supabase } from "../../utils/supabase/client";
 import camilleImage from "figma:asset/09a506315f8c8fec25acae2f02c2bbe6694afef2.png";
 
-type View = "dashboard" | "clients" | "requests" | "assets" | "settings" | "client-detail";
+// Removed "dashboard" from the View type
+type View = "clients" | "requests" | "assets" | "settings" | "client-detail";
 
 export function AdminPanel() {
-  const [currentView, setCurrentView] = useState<View>("dashboard");
+  // Default view is now "clients" instead of "dashboard"
+  const [currentView, setCurrentView] = useState<View>("clients");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const handleLogout = async () => {
@@ -32,11 +34,11 @@ export function AdminPanel() {
 
   const handleBackToClients = () => {
     setSelectedClientId(null);
-    setCurrentView("dashboard");
+    setCurrentView("clients"); // Changed from "dashboard" to "clients"
   };
 
+  // Removed Dashboard nav item entirely
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "clients", label: "Clients", icon: Users },
     { id: "requests", label: "Requests", icon: FileText },
     { id: "assets", label: "Assets", icon: FolderOpen },
@@ -92,7 +94,6 @@ export function AdminPanel() {
               const Icon = item.icon;
               const isActive =
                 currentView === item.id ||
-                (currentView === "dashboard" && item.id === "dashboard") ||
                 (currentView === "client-detail" && item.id === "clients");
 
               return (
@@ -118,7 +119,6 @@ export function AdminPanel() {
 
         {/* Main Content */}
         <main className="flex-1">
-          {currentView === "dashboard" && <AdminDashboard onSelectClient={handleSelectClient} />}
           {currentView === "clients" && <AdminDashboard onSelectClient={handleSelectClient} />}
           {currentView === "requests" && <AdminRequests />}
           {currentView === "client-detail" && selectedClientId && (

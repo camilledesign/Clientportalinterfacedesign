@@ -43,6 +43,8 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
   }, [clientId]);
 
   const loadClientData = async () => {
+    let isMounted = true; // Track if component is still mounted
+
     try {
       setLoading(true);
       console.log('🔄 Loading client data for ID:', clientId);
@@ -52,12 +54,17 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
         getClientAssets(clientId)
       ]);
       
+      // Only update state if component is still mounted
+      if (!isMounted) return;
+      
       console.log('✅ Client data loaded:', clientData);
       console.log('✅ Assets data loaded:', assetsData);
       
       setClient(clientData.client);
       setAssets(assetsData);
     } catch (error: any) {
+      if (!isMounted) return;
+      
       console.error('❌ Error loading client data:', {
         clientId,
         error: error.message,
@@ -72,8 +79,14 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
         productAssets: { figmaLinks: [], changelog: [] }
       });
     } finally {
+      if (!isMounted) return;
       setLoading(false);
     }
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,11 +144,12 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
-      const rgb = `rgb(${r}, ${g}, ${b})`;
+      const rgb = `${r}, ${g}, ${b}`;
 
       // Create metadata asset in database
+      // NO "Brand Color - " prefix - just use the name directly
       const description = `HEX: ${colorForm.hex} | RGB: ${rgb}`;
-      await createMetadataAsset(clientId, `Brand Color - ${colorForm.name}`, description);
+      await createMetadataAsset(clientId, colorForm.name, description);
 
       // Reload client data to refresh assets
       await loadClientData();
@@ -166,12 +180,13 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
-      const rgb = `rgb(${r}, ${g}, ${b})`;
+      const rgb = `${r}, ${g}, ${b}`;
 
       // Update metadata asset in database
+      // NO "Brand Color - " prefix - just use the name directly
       const description = `HEX: ${colorForm.hex} | RGB: ${rgb}`;
       await updateMetadataAsset(color.id, {
-        label: `Brand Color - ${colorForm.name}`,
+        label: colorForm.name,
         description
       });
 
