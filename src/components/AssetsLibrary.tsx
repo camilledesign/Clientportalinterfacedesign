@@ -6,17 +6,20 @@ import { ProductAssets } from "./assets/ProductAssets";
 import { getUserAssets } from "../utils/api";
 import { handlePossibleSessionError } from "../utils/supabase/errors";
 
-export function AssetsLibrary() {
+interface AssetsLibraryProps {
+  globalRefreshToken?: number;
+}
+
+export function AssetsLibrary({ globalRefreshToken = 0 }: AssetsLibraryProps) {
   const [activeTab, setActiveTab] = useState("brand");
   const [assets, setAssets] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchAssets();
-  }, []);
-
+  // Fetch assets function - defined outside useEffect so it can be called from error handler
   const fetchAssets = async () => {
+    let isMounted = true;
+
     try {
       setLoading(true);
       setError("");
@@ -26,10 +29,14 @@ export function AssetsLibrary() {
       // Fetch assets using API helper
       const result = await getUserAssets();
       
+      if (!isMounted) return;
+      
       console.log('✅ AssetsLibrary: Fetched assets:', result.assets);
       
       setAssets(result.assets);
     } catch (err: any) {
+      if (!isMounted) return;
+      
       // Check if it's a session error
       if (handlePossibleSessionError(err)) {
         // Session expired - global handler will redirect to login
@@ -39,9 +46,18 @@ export function AssetsLibrary() {
       console.error("❌ AssetsLibrary: Error fetching assets:", err);
       setError(err.message || "Failed to load assets");
     } finally {
+      if (!isMounted) return;
       setLoading(false);
     }
+
+    return () => {
+      isMounted = false;
+    };
   };
+
+  useEffect(() => {
+    fetchAssets();
+  }, [globalRefreshToken]); // Re-fetch when globalRefreshToken changes
 
   if (loading) {
     return (

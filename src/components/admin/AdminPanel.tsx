@@ -9,7 +9,11 @@ import camilleImage from "figma:asset/09a506315f8c8fec25acae2f02c2bbe6694afef2.p
 // Removed "dashboard" from the View type
 type View = "clients" | "requests" | "assets" | "settings" | "client-detail";
 
-export function AdminPanel() {
+interface AdminPanelProps {
+  globalRefreshToken?: number;
+}
+
+export function AdminPanel({ globalRefreshToken = 0 }: AdminPanelProps) {
   // Default view is now "clients" instead of "dashboard"
   const [currentView, setCurrentView] = useState<View>("clients");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);

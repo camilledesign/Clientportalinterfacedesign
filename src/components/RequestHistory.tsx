@@ -15,18 +15,21 @@ interface Request {
   deliveredDate?: string;
 }
 
-export function RequestHistory() {
+interface RequestHistoryProps {
+  globalRefreshToken?: number;
+}
+
+export function RequestHistory({ globalRefreshToken = 0 }: RequestHistoryProps) {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedBrief, setSelectedBrief] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
+  // Fetch requests function - defined outside useEffect so it can be called from error handler
   const fetchRequests = async () => {
+    let isMounted = true;
+
     try {
       setLoading(true);
       setError("");
@@ -36,10 +39,14 @@ export function RequestHistory() {
       // Fetch requests using API helper
       const result = await getUserRequests();
       
+      if (!isMounted) return;
+      
       console.log('✅ RequestHistory: Fetched requests:', result.requests.length);
       
       setRequests(result.requests);
     } catch (err: any) {
+      if (!isMounted) return;
+      
       // Check if it's a session error
       if (handlePossibleSessionError(err)) {
         // Session expired - global handler will redirect to login
@@ -49,9 +56,18 @@ export function RequestHistory() {
       console.error("❌ RequestHistory: Error fetching requests:", err);
       setError(err.message || "Failed to load requests");
     } finally {
+      if (!isMounted) return;
       setLoading(false);
     }
+
+    return () => {
+      isMounted = false;
+    };
   };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [globalRefreshToken]); // Re-fetch when globalRefreshToken changes
 
   // Filter requests by status
   const currentRequest = requests.find(r => r.status === "in-progress" || r.status === "new");

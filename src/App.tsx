@@ -34,6 +34,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [needsDbSetup, setNeedsDbSetup] = useState(false);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
+  
+  // Global refresh token - incremented when window regains focus with valid session
+  const [globalRefreshToken, setGlobalRefreshToken] = useState(0);
 
   // Register global session expiry handler
   useEffect(() => {
@@ -150,6 +153,74 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Global window focus/visibility handler - revalidates auth and refreshes data
+  useEffect(() => {
+    // Create stable handler function
+    const handleFocusRefresh = async () => {
+      // Don't run during initial auth check
+      if (isCheckingAuth) return;
+      
+      // Don't run if not authenticated yet
+      if (!isAuth) return;
+
+      console.log('🟡 Window regained focus - revalidating session...');
+
+      try {
+        // Re-check auth with Supabase
+        const { data, error } = await supabase.auth.getUser();
+        
+        if (error || !data?.user) {
+          // Session expired or invalid
+          console.log('🔴 Session expired on focus - logging out');
+          setIsAuth(false);
+          setCurrentUser(null);
+          setSessionExpiredMessage('Your session has expired. Please log in again.');
+          
+          setTimeout(() => {
+            setSessionExpiredMessage(null);
+          }, 5000);
+          return;
+        }
+
+        // Session is valid - refresh profile and bump refresh token
+        console.log('✅ Session valid on focus - refreshing profile...');
+        const profile = await initUserProfile();
+        setCurrentUser(profile);
+        setIsAuth(true);
+        
+        // Bump the global refresh token to trigger data reloads in child components
+        setGlobalRefreshToken((t) => t + 1);
+        console.log('✅ Focus refresh complete - globalRefreshToken bumped');
+      } catch (e: any) {
+        console.error('❌ Focus refresh failed:', e);
+        // If refresh fails, log out to prevent stuck state
+        setIsAuth(false);
+        setCurrentUser(null);
+        setSessionExpiredMessage('Session validation failed. Please log in again.');
+        
+        setTimeout(() => {
+          setSessionExpiredMessage(null);
+        }, 5000);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleFocusRefresh();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('focus', handleFocusRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('focus', handleFocusRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuth, isCheckingAuth]); // Re-register when auth state changes
 
   const handleLoginSuccess = () => {
     setIsAuth(true);
@@ -341,7 +412,7 @@ GRANT ALL ON public.profiles TO service_role;`}
 
   // Show admin panel if user is admin
   if (currentUser?.is_admin) {
-    return <AdminPanel />;
+    return <AdminPanel globalRefreshToken={globalRefreshToken} />;
   }
 
   // If a form is active, show the form
@@ -447,11 +518,11 @@ GRANT ALL ON public.profiles TO service_role;`}
           )}
           
           {activeSection === "asset-library" && (
-            <AssetsLibrary />
+            <AssetsLibrary globalRefreshToken={globalRefreshToken} />
           )}
           
           {activeSection === "request-history" && (
-            <RequestHistory />
+            <RequestHistory globalRefreshToken={globalRefreshToken} />
           )}
           
           {activeSection === "profile" && (
