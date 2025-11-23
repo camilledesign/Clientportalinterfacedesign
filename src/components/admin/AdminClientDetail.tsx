@@ -38,6 +38,9 @@ export function AdminClientDetail({ clientId, onBack, globalRefreshToken = 0 }: 
   // Notes state
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  
+  // Loading states for various operations to prevent stuck UI
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     loadClientData();
