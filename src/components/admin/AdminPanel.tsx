@@ -123,10 +123,10 @@ export function AdminPanel({ globalRefreshToken = 0 }: AdminPanelProps) {
 
         {/* Main Content */}
         <main className="flex-1">
-          {currentView === "clients" && <AdminDashboard onSelectClient={handleSelectClient} />}
-          {currentView === "requests" && <AdminRequests />}
+          {currentView === "clients" && <AdminDashboard onSelectClient={handleSelectClient} globalRefreshToken={globalRefreshToken} />}
+          {currentView === "requests" && <AdminRequests globalRefreshToken={globalRefreshToken} />}
           {currentView === "client-detail" && selectedClientId && (
-            <AdminClientDetail clientId={selectedClientId} onBack={handleBackToClients} />
+            <AdminClientDetail clientId={selectedClientId} onBack={handleBackToClients} globalRefreshToken={globalRefreshToken} />
           )}
           {currentView === "assets" && (
             <div className="bg-white rounded-[24px] p-12 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">

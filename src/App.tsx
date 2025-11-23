@@ -156,14 +156,29 @@ export default function App() {
 
   // Global window focus/visibility handler - revalidates auth and refreshes data
   useEffect(() => {
+    let isRefreshing = false;
+
     // Create stable handler function
     const handleFocusRefresh = async () => {
-      // Don't run during initial auth check
-      if (isCheckingAuth) return;
-      
-      // Don't run if not authenticated yet
-      if (!isAuth) return;
+      // Prevent concurrent refreshes
+      if (isRefreshing) {
+        console.log('🟡 Already refreshing, skipping...');
+        return;
+      }
 
+      // Don't run during initial auth check
+      if (isCheckingAuth) {
+        console.log('🟡 Still checking auth on mount, skipping focus refresh');
+        return;
+      }
+
+      // Only run if we think we're authenticated
+      if (!isAuth) {
+        console.log('🟡 Not authenticated, skipping focus refresh');
+        return;
+      }
+
+      isRefreshing = true;
       console.log('🟡 Window regained focus - revalidating session...');
 
       try {
@@ -190,8 +205,11 @@ export default function App() {
         setIsAuth(true);
         
         // Bump the global refresh token to trigger data reloads in child components
-        setGlobalRefreshToken((t) => t + 1);
-        console.log('✅ Focus refresh complete - globalRefreshToken bumped');
+        setGlobalRefreshToken((t) => {
+          const newToken = t + 1;
+          console.log(`✅ Focus refresh complete - globalRefreshToken: ${t} → ${newToken}`);
+          return newToken;
+        });
       } catch (e: any) {
         console.error('❌ Focus refresh failed:', e);
         // If refresh fails, log out to prevent stuck state
@@ -202,11 +220,14 @@ export default function App() {
         setTimeout(() => {
           setSessionExpiredMessage(null);
         }, 5000);
+      } finally {
+        isRefreshing = false;
       }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        console.log('📄 Document became visible');
         handleFocusRefresh();
       }
     };
@@ -215,10 +236,13 @@ export default function App() {
     window.addEventListener('focus', handleFocusRefresh);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    console.log('👀 Focus/visibility listeners registered');
+
     // Cleanup
     return () => {
       window.removeEventListener('focus', handleFocusRefresh);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      console.log('👀 Focus/visibility listeners removed');
     };
   }, [isAuth, isCheckingAuth]); // Re-register when auth state changes
 

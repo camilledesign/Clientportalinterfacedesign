@@ -8,11 +8,12 @@ import { Input } from "../ui/input";
 interface AdminClientDetailProps {
   clientId: string;
   onBack: () => void;
+  globalRefreshToken?: number;
 }
 
 const tabs = ["Brand", "Website", "Product", "Notes", "Settings"];
 
-export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) {
+export function AdminClientDetail({ clientId, onBack, globalRefreshToken = 0 }: AdminClientDetailProps) {
   const [activeTab, setActiveTab] = useState("Brand");
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<any>(null);
@@ -40,7 +41,7 @@ export function AdminClientDetail({ clientId, onBack }: AdminClientDetailProps) 
 
   useEffect(() => {
     loadClientData();
-  }, [clientId]);
+  }, [clientId, globalRefreshToken]); // Re-fetch when clientId or globalRefreshToken changes
 
   const loadClientData = async () => {
     let isMounted = true; // Track if component is still mounted

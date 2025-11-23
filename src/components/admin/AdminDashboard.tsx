@@ -20,41 +20,61 @@ interface Client {
 
 interface AdminDashboardProps {
   onSelectClient: (clientId: string) => void;
+  globalRefreshToken?: number;
 }
 
-export function AdminDashboard({ onSelectClient }: AdminDashboardProps) {
+export function AdminDashboard({ onSelectClient, globalRefreshToken = 0 }: AdminDashboardProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadClients();
-  }, []);
+    let isMounted = true;
 
-  const loadClients = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('📊 Loading clients from public.profiles...');
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('❌ Error loading profiles:', error);
-        throw error;
+    const loadClients = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log('📊 Loading clients from public.profiles...');
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('❌ Error loading profiles:', error);
+          throw error;
+        }
+        
+        if (!isMounted) return;
+        
+        console.log('✅ Profiles loaded:', data);
+        setClients(data || []);
+      } catch (err: any) {
+        if (!isMounted) return;
+        
+        console.error("❌ Error loading clients:", err);
+        setError(err.message || 'Failed to load clients');
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
       }
-      
-      console.log('✅ Profiles loaded:', data);
-      setClients(data || []);
-    } catch (err: any) {
-      console.error("❌ Error loading clients:", err);
-      setError(err.message || 'Failed to load clients');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadClients();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [globalRefreshToken]); // Re-fetch when globalRefreshToken changes
+
+  // Retry function for error state
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    // Trigger reload by incrementing a local counter or just directly fetching
+    window.location.reload();
   };
 
   const formatLastActivity = (isoDate: string) => {
@@ -108,7 +128,7 @@ export function AdminDashboard({ onSelectClient }: AdminDashboardProps) {
           <div className="bg-white rounded-[24px] p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
             <p className="text-red-500 mb-4">{error}</p>
             <Button 
-              onClick={loadClients}
+              onClick={handleRetry}
               className="rounded-full bg-[#0071E3] hover:bg-[#0077ED] text-white px-6 py-3"
             >
               Retry

@@ -22,7 +22,11 @@ const columns = [
   { id: "done", title: "Done", color: "bg-green-100 text-green-700" },
 ];
 
-export function AdminRequests() {
+interface AdminRequestsProps {
+  globalRefreshToken?: number;
+}
+
+export function AdminRequests({ globalRefreshToken = 0 }: AdminRequestsProps) {
   const [requests, setRequests] = useState<Request[]>([]);
   const [selectedBrief, setSelectedBrief] = useState<any>(null);
   const [showStatusMenu, setShowStatusMenu] = useState<string | null>(null);
@@ -34,27 +38,39 @@ export function AdminRequests() {
   });
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    let isMounted = true;
 
-  const loadRequests = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Loading requests...');
-      const response = await getRequests();
-      console.log('✅ Requests loaded:', response);
-      setRequests(response.requests || []);
-    } catch (error: any) {
-      console.error('❌ Error loading requests:', {
-        message: error.message,
-        stack: error.stack
-      });
-      // Show a user-friendly alert
-      alert(`Failed to load requests: ${error.message}\n\nPlease check the console for details.`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadRequests = async () => {
+      try {
+        setLoading(true);
+        console.log('🔄 Loading requests...');
+        const response = await getRequests();
+        
+        if (!isMounted) return;
+        
+        console.log('✅ Requests loaded:', response);
+        setRequests(response.requests || []);
+      } catch (error: any) {
+        if (!isMounted) return;
+        
+        console.error('❌ Error loading requests:', {
+          message: error.message,
+          stack: error.stack
+        });
+        // Show a user-friendly alert
+        alert(`Failed to load requests: ${error.message}\n\nPlease check the console for details.`);
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
+      }
+    };
+
+    loadRequests();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [globalRefreshToken]); // Re-fetch when globalRefreshToken changes
 
   // Build clean filter option lists from actual data
   const getUniqueClients = () => {
@@ -100,6 +116,7 @@ export function AdminRequests() {
   const handleStatusChange = async (requestId: string, newStatus: "new" | "in-progress" | "waiting-feedback" | "done") => {
     try {
       // Optimistically update UI
+      const previousRequests = [...requests];
       setRequests(requests.map(req => 
         req.id === requestId ? { ...req, status: newStatus } : req
       ));
@@ -109,8 +126,8 @@ export function AdminRequests() {
       await updateRequestStatus(requestId, newStatus);
     } catch (error) {
       console.error("Error updating request status:", error);
-      // Revert on error
-      loadRequests();
+      // On error, force a page reload to get fresh data
+      window.location.reload();
     }
   };
 
