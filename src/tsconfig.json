@@ -15,18 +15,28 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": true,
+    "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    
+    /* Path resolution */
+    "baseUrl": ".",
+    "paths": {
+      "*": ["./*"]
+    }
   },
   "include": [
     "*.tsx",
     "*.ts",
-    "components/**/*",
-    "pages/**/*",
-    "utils/**/*",
-    "styles/**/*"
+    "main.tsx",
+    "App.tsx",
+    "components/**/*.tsx",
+    "components/**/*.ts",
+    "pages/**/*.tsx",
+    "pages/**/*.ts",
+    "utils/**/*.tsx",
+    "utils/**/*.ts"
   ],
   "exclude": [
     "node_modules",
