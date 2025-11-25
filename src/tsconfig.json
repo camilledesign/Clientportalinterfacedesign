@@ -27,16 +27,8 @@
     }
   },
   "include": [
-    "*.tsx",
-    "*.ts",
-    "main.tsx",
-    "App.tsx",
-    "components/**/*.tsx",
-    "components/**/*.ts",
-    "pages/**/*.tsx",
-    "pages/**/*.ts",
-    "utils/**/*.tsx",
-    "utils/**/*.ts"
+    "src/**/*.tsx",
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
