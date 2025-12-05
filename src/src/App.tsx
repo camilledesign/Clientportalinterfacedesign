@@ -1,23 +1,21 @@
-import { ClientDashboard } from "./components/ClientDashboard";
-import { AdminPanel } from "./components/admin/AdminPanel";
-import { Login } from "./components/Login";
-import { DatabaseCleanup } from "./components/DatabaseCleanup";
-import { AuthDebug } from "./components/AuthDebug";
-import { DatabaseSetup } from "./components/DatabaseSetup";
-import { isAuthenticated, initUserProfile } from "./utils/auth";
-import { supabase } from "./utils/supabase/client";
-import { projectId } from "./utils/supabase/info";
+import { AdminPanel } from "../components/admin/AdminPanel";
+import { Login } from "../components/Login";
+import { DatabaseCleanup } from "../components/DatabaseCleanup";
+import { AuthDebug } from "../components/AuthDebug";
+import { initUserProfile } from "../utils/auth";
+import { supabase } from "../utils/supabase/client";
+import { projectId } from "../utils/supabase/info";
 import { useState, useEffect } from "react";
-import { Navigation } from "./components/Navigation";
-import { Footer } from "./components/Footer";
-import { RequestSection } from "./components/RequestSection";
-import { AssetsLibrary } from "./components/AssetsLibrary";
-import { RequestHistory } from "./components/RequestHistory";
-import { Profile } from "./components/Profile";
-import { WebsiteRequestForm } from "./components/forms/WebsiteRequestForm";
-import { BrandRequestForm } from "./components/forms/BrandRequestForm";
-import { ProductRequestForm } from "./components/forms/ProductRequestForm";
-import { setOnSessionExpired } from "./utils/supabase/errors";
+import { Navigation } from "../components/Navigation";
+import { Footer } from "../components/Footer";
+import { RequestSection } from "../components/RequestSection";
+import { AssetsLibrary } from "../components/AssetsLibrary";
+import { RequestHistory } from "../components/RequestHistory";
+import { Profile } from "../components/Profile";
+import { WebsiteRequestForm } from "../components/forms/WebsiteRequestForm";
+import { BrandRequestForm } from "../components/forms/BrandRequestForm";
+import { ProductRequestForm } from "../components/forms/ProductRequestForm";
+import { setOnSessionExpired } from "../utils/supabase/errors";
 
 type MainSection = "new-request" | "asset-library" | "request-history" | "profile" | "admin";
 type FormView = "website-form" | "brand-form" | "product-form" | null;
@@ -32,7 +30,6 @@ export default function App() {
   const [showCleanup, setShowCleanup] = useState(false);
   const [showAuthDebug, setShowAuthDebug] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [needsDbSetup, setNeedsDbSetup] = useState(false);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   
   // Global refresh token - incremented when window regains focus with valid session

@@ -28,7 +28,15 @@
   },
   "include": [
     "src/**/*.tsx",
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "components/**/*.tsx",
+    "components/**/*.ts",
+    "pages/**/*.tsx",
+    "pages/**/*.ts",
+    "utils/**/*.ts",
+    "utils/**/*.tsx",
+    "*.tsx",
+    "*.ts"
   ],
   "exclude": [
     "node_modules",
