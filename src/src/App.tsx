@@ -1,11 +1,6 @@
-import { AdminPanel } from "../components/admin/AdminPanel";
-import { Login } from "../components/Login";
-import { DatabaseCleanup } from "../components/DatabaseCleanup";
-import { AuthDebug } from "../components/AuthDebug";
-import { initUserProfile } from "../utils/auth";
 import { supabase } from "../utils/supabase/client";
 import { projectId } from "../utils/supabase/info";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigation } from "../components/Navigation";
 import { Footer } from "../components/Footer";
 import { RequestSection } from "../components/RequestSection";
@@ -34,6 +29,11 @@ export default function App() {
   
   // Global refresh token - incremented when window regains focus with valid session
   const [globalRefreshToken, setGlobalRefreshToken] = useState(0);
+
+  // Refs for throttled focus refresh
+  const isRefreshingRef = useRef(false);
+  const lastRefreshRef = useRef(0);
+  const MIN_REFRESH_INTERVAL_MS = 30000; // 30 seconds
 
   // Register global session expiry handler
   useEffect(() => {
@@ -152,54 +152,63 @@ export default function App() {
   }, []);
 
   // Global window focus/visibility handler - revalidates auth and refreshes data
+  // Production-grade throttled refresh with ref-based state tracking
   useEffect(() => {
-    let isRefreshing = false;
-
-    // Create stable handler function
     const handleFocusRefresh = async () => {
-      // Prevent concurrent refreshes
-      if (isRefreshing) {
-        console.log('🟡 Already refreshing, skipping...');
+      // Skip if already refreshing
+      if (isRefreshingRef.current) {
         return;
       }
 
-      // Don't run during initial auth check
+      // Skip if still checking auth on mount
       if (isCheckingAuth) {
-        console.log('🟡 Still checking auth on mount, skipping focus refresh');
         return;
       }
 
-      // Only run if we think we're authenticated
+      // Skip if not authenticated
       if (!isAuth) {
-        console.log('🟡 Not authenticated, skipping focus refresh');
         return;
       }
 
-      isRefreshing = true;
-      console.log('🟡 Window regained focus - revalidating session...');
+      // Skip if document is not visible
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      // Skip if offline
+      if (navigator.onLine === false) {
+        return;
+      }
+
+      // Throttle: skip if last refresh was less than 30 seconds ago
+      const now = Date.now();
+      if (now - lastRefreshRef.current < MIN_REFRESH_INTERVAL_MS) {
+        return;
+      }
+
+      // All checks passed - proceed with refresh
+      isRefreshingRef.current = true;
+      console.log('🔄 Running focus refresh...');
 
       try {
         // Re-check auth with Supabase
         const { data, error } = await supabase.auth.getUser();
         
         if (error || !data?.user) {
-          // Session expired or invalid
-          console.log('🔴 Session expired on focus - logging out');
-          setIsAuth(false);
-          setCurrentUser(null);
-          setSessionExpiredMessage('Your session has expired. Please log in again.');
-          
-          setTimeout(() => {
-            setSessionExpiredMessage(null);
-          }, 5000);
+          // Session is invalid - but don't force logout here
+          // Let the setOnSessionExpired handler deal with real session expiry
+          console.warn('⚠️ Focus refresh found no user - network hiccup or session issue');
           return;
         }
 
-        // Session is valid - refresh profile and bump refresh token
-        console.log('✅ Session valid on focus - refreshing profile...');
+        // Session is valid - refresh profile
+        console.log('✅ Session valid - refreshing profile...');
         const profile = await initUserProfile();
         setCurrentUser(profile);
         setIsAuth(true);
+        
+        // Update last refresh timestamp
+        lastRefreshRef.current = Date.now();
         
         // Bump the global refresh token to trigger data reloads in child components
         setGlobalRefreshToken((t) => {
@@ -209,36 +218,33 @@ export default function App() {
         });
       } catch (e: any) {
         console.error('❌ Focus refresh failed:', e);
-        // If refresh fails, log out to prevent stuck state
-        setIsAuth(false);
-        setCurrentUser(null);
-        setSessionExpiredMessage('Session validation failed. Please log in again.');
-        
-        setTimeout(() => {
-          setSessionExpiredMessage(null);
-        }, 5000);
+        // Don't force logout on error - could be a temporary network issue
+        // The setOnSessionExpired handler will handle real session expiry
       } finally {
-        isRefreshing = false;
+        isRefreshingRef.current = false;
       }
     };
 
-    const handleVisibilityChange = () => {
+    const onWindowFocus = () => {
+      handleFocusRefresh();
+    };
+
+    const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('📄 Document became visible');
         handleFocusRefresh();
       }
     };
 
     // Add event listeners
-    window.addEventListener('focus', handleFocusRefresh);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     console.log('👀 Focus/visibility listeners registered');
 
     // Cleanup
     return () => {
-      window.removeEventListener('focus', handleFocusRefresh);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       console.log('👀 Focus/visibility listeners removed');
     };
   }, [isAuth, isCheckingAuth]); // Re-register when auth state changes
